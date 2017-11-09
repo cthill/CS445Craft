@@ -1,16 +1,20 @@
-/*
- * To change this license header, choose License Headers in Project Properties.
- * To change this template file, choose Tools | Templates
- * and open the template in the editor.
- */
+/***************************************************************
+* file: Voxel.java
+* author: CS445 Group 42^3
+* class: CS 445 – Computer Graphics
+*
+* assignment: Final Project
+* date last modified: 10/08/2017
+*
+* purpose: This class defines a Voxel at a fixed x,y, and z position.
+* It uses GL_QUADS to render a cube centered at that point with
+* side length s = 2r
+* 
+****************************************************************/
 package cs445craft;
 
 import static org.lwjgl.opengl.GL11.*;
 
-/**
- *
- * @author cthill
- */
 public class Voxel extends Drawable {
     protected float r = .5f;
     
@@ -23,6 +27,11 @@ public class Voxel extends Drawable {
         this.r = r;
     }
     
+    /**
+    * method: draw
+    * purpose: use GL_QUADS to render a cube centered at (x,y,z) with side length
+    * equal to 2r.
+    **/
     public void draw() {
         glPushMatrix();
         glTranslatef(x, y, z);

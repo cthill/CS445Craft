@@ -1,8 +1,16 @@
-/*
- * To change this license header, choose License Headers in Project Properties.
- * To change this template file, choose Tools | Templates
- * and open the template in the editor.
- */
+/***************************************************************
+* file: Screen.java
+* author: CS445 Group 42^3
+* class: CS 445 – Computer Graphics
+*
+* assignment: Final Project
+* date last modified: 10/08/2017
+*
+* purpose: This class is responsible for managing the OpenGL window
+* and maintains a list of 'Drawable' objects that need to be
+* rendered on each frame. It requires a Camera object.
+* 
+****************************************************************/
 package cs445craft;
 
 import java.util.ArrayList;
@@ -13,11 +21,6 @@ import org.lwjgl.opengl.DisplayMode;
 import static org.lwjgl.opengl.GL11.*;
 import org.lwjgl.util.glu.GLU;
 
-
-/**
- *
- * @author cthill
- */
 public class Screen {
     protected int width, height;
     protected String title;
@@ -48,11 +51,21 @@ public class Screen {
         glMatrixMode(GL_MODELVIEW);
         glHint(GL_PERSPECTIVE_CORRECTION_HINT, GL_NICEST);
     }
-    
+
+    /**
+    * method: addObject
+    * purpose: add an object that satisfies the Drawable interface. Object will
+    * be drawn to the screen on each frame.
+    **/
     public void addObject(Drawable object) {
         objects.add(object);
     }
     
+    /**
+    * method: drawFrame
+    * purpose: Draw one frame by looping through the list of Drawable objects
+    * and rendering each one.
+    **/
     public void drawFrame() {
         glLoadIdentity();
         camera.lookThrough();
@@ -67,6 +80,10 @@ public class Screen {
         Display.sync(60);
     }
     
+    /**
+    * method: getCloseRequested
+    * purpose: Returns true if the user requested to close the window.
+    **/
     public boolean getCloseRequested() {
         if (Display.isCloseRequested()) {
             Display.destroy();
@@ -76,6 +93,10 @@ public class Screen {
         return false;
     }
     
+    /**
+    * method: close
+    * purpose: close the window
+    **/
     public void close() {
         Display.destroy();
     }

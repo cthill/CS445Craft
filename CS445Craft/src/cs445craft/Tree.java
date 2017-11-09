@@ -1,8 +1,15 @@
-/*
- * To change this license header, choose License Headers in Project Properties.
- * To change this template file, choose Tools | Templates
- * and open the template in the editor.
- */
+/***************************************************************
+* file: Tree.java
+* author: CS445 Group 42^3
+* class: CS 445 – Computer Graphics
+*
+* assignment: Final Project
+* date last modified: 10/08/2017
+*
+* purpose: This class extends the Drawable class and uses the
+* Voxel class to draw a tree.
+* 
+****************************************************************/
 package cs445craft;
 
 import java.util.ArrayList;
@@ -11,10 +18,6 @@ import static org.lwjgl.opengl.GL11.glPopMatrix;
 import static org.lwjgl.opengl.GL11.glPushMatrix;
 import static org.lwjgl.opengl.GL11.glTranslatef;
 
-/**
- *
- * @author cthill
- */
 public class Tree extends Drawable {
     protected List<Voxel> blocks;
     
@@ -41,6 +44,10 @@ public class Tree extends Drawable {
         blocks.add(new Voxel(-1,3, -1));
     }
     
+    /**
+    * method: draw
+    * purpose: Use the predefined list of Voxel objects to render a Tree.
+    **/
     public void draw() {
         glPushMatrix();
         glTranslatef(x, y, z);

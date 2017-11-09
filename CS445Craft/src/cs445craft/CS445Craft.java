@@ -1,8 +1,15 @@
-/*
- * To change this license header, choose License Headers in Project Properties.
- * To change this template file, choose Tools | Templates
- * and open the template in the editor.
- */
+/***************************************************************
+* file: CS445Craft.java
+* author: CS445 Group 42^3
+* class: CS 445 – Computer Graphics
+*
+* assignment: Final Project
+* date last modified: 10/08/2017
+*
+* purpose: This is the main class in the program. It instantiates
+* the screen, the camera, and collects keyboard/mouse input
+* 
+****************************************************************/
 package cs445craft;
 
 import java.util.logging.Level;
@@ -11,17 +18,14 @@ import org.lwjgl.LWJGLException;
 import org.lwjgl.input.Keyboard;
 import org.lwjgl.input.Mouse;
 
-/**
- *
- * @author cthill
- */
 public class CS445Craft {
 
     /**
-     * @param args the command line arguments
-     */
+    * method: main
+    * purpose: Start the main program by instantiating a Camera, a Screen,
+    * and calling run().
+    **/
     public static void main(String[] args) {
-        // TODO code application logic here
         Screen s;
         try {
             Camera c = new Camera(0,0,0);
@@ -34,6 +38,11 @@ public class CS445Craft {
         }
     }
     
+    /**
+    * method: run
+    * purpose: The main event loop of the game. Collects user input and requires
+    * a Screen and Camera object.
+    **/
     private static void run(Screen screen, Camera camera) {
         float speed = .05f;
         

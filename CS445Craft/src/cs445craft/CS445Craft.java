@@ -61,7 +61,7 @@ public class CS445Craft {
             camera.incPitch(Mouse.getDY() * mouseSens);
             
             // listen for q key
-            if (Keyboard.isKeyDown(Keyboard.KEY_Q)) {
+            if (Keyboard.isKeyDown(Keyboard.KEY_ESCAPE) || Keyboard.isKeyDown(Keyboard.KEY_Q)) {
                 screen.close();
                 break;
             }

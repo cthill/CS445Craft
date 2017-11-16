@@ -40,15 +40,12 @@ public class Screen {
         Display.setTitle(title);
         Display.create();
         
-        // init OpenGL
-        glClearColor(0.0f, 0.0f, 0.0f, 0.0f);
+        glClearColor(0.5f, 0.85f, 1.0f, 0.0f);
         glEnable(GL_TEXTURE_2D);
         glEnableClientState (GL_TEXTURE_COORD_ARRAY);
-        glEnable(GL_DEPTH_TEST);
-        glMatrixMode(GL_PROJECTION);
+        glEnableClientState(GL_VERTEX_ARRAY);
+
         glLoadIdentity();
-        GLU.gluPerspective(100.0f, (float) width / (float) height, 0.05f, 300.0f);
-        glMatrixMode(GL_MODELVIEW);
         glHint(GL_PERSPECTIVE_CORRECTION_HINT, GL_NICEST);
     }
 
@@ -67,7 +64,17 @@ public class Screen {
     * and rendering each one.
     **/
     public void drawFrame() {
+        // 3d draw
+        
+        glColor3f(1.0f,1.0f,1.0f);
+        glMatrixMode(GL_PROJECTION);
+        glPushMatrix();
         glLoadIdentity();
+        GLU.gluPerspective(100.0f, (float) width / (float) height, 0.05f, 300.0f);
+        glMatrixMode(GL_MODELVIEW);
+        glEnable(GL_DEPTH_TEST);
+        
+        
         camera.lookThrough();
         
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
@@ -75,6 +82,35 @@ public class Screen {
         for (Drawable object: objects) {
             object.draw();
         }
+        glPopMatrix();
+        
+        // 2d hud draw
+        glMatrixMode(GL_PROJECTION);
+        glPushMatrix();
+        glLoadIdentity();
+        glOrtho(-width/2, width/2, -height/2, height/2, 1, -1);
+        glMatrixMode(GL_MODELVIEW);
+        glLoadIdentity();
+        glDisable(GL_DEPTH_TEST);
+        glClear(GL_DEPTH_BUFFER_BIT);
+        
+        // draw crosshairs
+        glBindTexture(GL_TEXTURE_2D, 0);
+        glColor3f(1.0f, 1.0f, 1.0f);
+        glPointSize(2);
+        glBegin(GL_POINTS);
+            glVertex2f(0,0);
+            glVertex2f(2,0);
+            glVertex2f(4,0);
+            glVertex2f(-2, 0);
+            glVertex2f(-4, 0);
+            glVertex2f(0, 2);
+            glVertex2f(0,4);
+            glVertex2f(0,-2);
+            glVertex2f(0,-4);
+        glEnd();
+        glPopMatrix();
+        
 
         Display.update();
         Display.sync(60);

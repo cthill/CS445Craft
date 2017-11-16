@@ -13,11 +13,7 @@
 package cs445craft;
 
 public abstract class Drawable {
-    protected float x, y, z;
-    public Drawable(float x, float y, float z) {
-        this.x = x;
-        this.y = y;
-        this.z = z;
+    public Drawable() {
     }
     
     /**

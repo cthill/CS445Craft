@@ -15,11 +15,14 @@ package cs445craft;
 import static org.lwjgl.opengl.GL11.*;
 
 public class Camera {
-    protected Vector3f position;
-    protected float yaw, pitch;
+    private static final float minPitch = -90.0f;
+    private static final float maxPitch = 90.0f;
+    public float x,y,z, yaw, pitch;
     
     public Camera(float x, float y, float z) {
-        position = new Vector3f(x, y, z);
+        this.x = x;
+        this.y = y;
+        this.z = z;
     }
     
     /**
@@ -38,39 +41,11 @@ public class Camera {
     **/
     public void incPitch(float pitch) {
         this.pitch -= pitch;
-    }
-    
-    /**
-    * method: move
-    * purpose: move the camera forward or backwards in the 3d world by the given
-    * distance. Positive values move forward, negative values move backward.
-    **/
-    public void move(float dist) {
-        float xOffset = dist * (float) Math.sin(Math.toRadians(yaw));
-        float zOffset = dist * (float) Math.cos(Math.toRadians(yaw));
-        position.x -= xOffset;
-        position.z += zOffset;
-    }
-    
-    /**
-    * method: strafe
-    * purpose: strafe the camera in the 3d world by the given distance. Positive
-    * values strafe right, negative values strafe left.
-    **/
-    public void strafe(float dist) {
-        float xOffset = dist * (float)Math.sin(Math.toRadians(yaw-90));
-        float zOffset = dist * (float)Math.cos(Math.toRadians(yaw-90));
-        position.x += xOffset;
-        position.z -= zOffset;
-    }
-    
-    /**
-    * method: elevate
-    * purpose: change the camera's elevation by the given float distance. Positive
-    * values increase elevation, negative values decrease elevation.
-    **/
-    public void elevate(float dist) {
-        position.y += dist;
+        if (this.pitch < minPitch) {
+            this.pitch = minPitch;
+        } else if (this.pitch > maxPitch) {
+            this.pitch = maxPitch;
+        }
     }
     
     /**
@@ -81,6 +56,6 @@ public class Camera {
     public void lookThrough() {
         glRotatef(pitch, 1.0f, 0.0f, 0.0f);
         glRotatef(yaw, 0.0f, 1.0f, 0.0f);
-        glTranslatef(position.x, position.y, position.z);
+        glTranslatef(x, y, z);
     }
 }

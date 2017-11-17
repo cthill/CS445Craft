@@ -12,18 +12,11 @@
 ****************************************************************/
 package cs445craft;
 
-public abstract class Drawable {
-    protected float x, y, z;
-    public Drawable(float x, float y, float z) {
-        this.x = x;
-        this.y = y;
-        this.z = z;
-    }
-    
+public interface Drawable {    
     /**
     * method: draw
     * purpose: abstract method to draw the object to the screen. Call on each
     * frame.
     **/
-    public abstract void draw();
+    public void draw();
 }

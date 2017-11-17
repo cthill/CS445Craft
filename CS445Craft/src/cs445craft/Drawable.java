@@ -12,14 +12,11 @@
 ****************************************************************/
 package cs445craft;
 
-public abstract class Drawable {
-    public Drawable() {
-    }
-    
+public interface Drawable {    
     /**
     * method: draw
     * purpose: abstract method to draw the object to the screen. Call on each
     * frame.
     **/
-    public abstract void draw();
+    public void draw();
 }

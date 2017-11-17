@@ -1,56 +1,77 @@
-/*
- * To change this license header, choose License Headers in Project Properties.
- * To change this template file, choose Tools | Templates
- * and open the template in the editor.
- */
+/***************************************************************
+* file: Chunk.java
+* author: CS445 Group 42^3
+* class: CS 445 – Computer Graphics
+*
+* assignment: Final Project
+* date last modified: 10/16/2017
+*
+* purpose: This class defines one 30x30x30 chunk of voxels. The
+* contents of the chunk are randomly generated using simplex noise.
+* The class uses a 3d array of the enum VoxelType to keep track of
+* which blocks are in each cell. null entries indicate empty cells.
+* 
+****************************************************************/
+
 package cs445craft;
 
 import java.io.File;
 import java.io.FileInputStream;
-import java.io.FileNotFoundException;
 import java.io.IOException;
 import java.nio.FloatBuffer;
 import java.util.Random;
-import java.util.logging.Level;
-import java.util.logging.Logger;
 import org.lwjgl.BufferUtils;
 import static org.lwjgl.opengl.GL11.*;
 import static org.lwjgl.opengl.GL15.*;
 import org.newdawn.slick.opengl.Texture;
 import org.newdawn.slick.opengl.TextureLoader;
 
-/**
- *
- * @author cthill
- */
-public class Chunk extends Drawable {
-    public static final int CUBE_S = 2;
+public class Chunk implements Drawable {
+    public static final int BLOCK_S = 2;
     public static final int CHUNK_S = 30; // 30 x 30 x 30 chunk
     public static final int HEADROOM = 5;
     public static final int NUM_BLOCKS = CHUNK_S * CHUNK_S * CHUNK_S;
     
-    protected float chunkX, chunkY, chunkZ;
-    protected Random rand;
-    protected Voxel[][][] data;
+    private enum VoxelType {
+        GRASS,
+        SAND,
+        WATER,
+        DIRT,
+        STONE,
+        TRUNK,
+        LEAVES,
+        BEDROCK
+    }
+    
+    public float chunkX, chunkY, chunkZ;
+    private Random rand;
+    private VoxelType[][][] blocks;
     
     private int VBOVertexHandle;
     private int VBOTextureHandle;
     private Texture texture;
+    private boolean excludeHidden;
     
-    public Chunk(float chunkX, float chunkY, float chunkZ) {
+    public Chunk(float chunkX, float chunkY, float chunkZ) throws IOException {
         this.chunkX = chunkX;
         this.chunkY = chunkY;
         this.chunkZ = chunkZ;
         
         rand = new Random();
-        data = new Voxel[CHUNK_S][CHUNK_S][CHUNK_S];
+        blocks = new VoxelType[CHUNK_S][CHUNK_S][CHUNK_S];
         
-        texture = loadTexture("terrain");
+        texture = TextureLoader.getTexture("png", new FileInputStream(new File("res/terrain.png")));
 
+        excludeHidden = false;
         generateRandomChunk();
         rebuildMesh();
     }
     
+    /**
+    * method: generateRandomChunk()
+    * purpose: Use simplex noise to fill the blocks array with blocks. Also adds
+    * trees at random.
+    **/
     private void generateRandomChunk() {
         int maxDelta = 6;
         SimplexNoise noiseGenHeight = new SimplexNoise(30, 0.35, rand.nextInt());
@@ -66,24 +87,24 @@ public class Chunk extends Drawable {
                 
                 int maxHeight = CHUNK_S - heightDelta - HEADROOM;
                 for (int y = 0; y < maxHeight; y++) {
-                    Voxel.Type type = Voxel.Type.BEDROCK;
+                    VoxelType type = VoxelType.BEDROCK;
                     
                     if (y < maxHeight - 1) {
                         if (y > 2 && y < CHUNK_S / 2) {
-                            type = Voxel.Type.STONE;
+                            type = VoxelType.STONE;
                         } else if (y >= CHUNK_S / 2) {
-                            type = Voxel.Type.DIRT;
+                            type = VoxelType.DIRT;
                         }
                     } else {
                         float v = (float) (noiseGenType.getNoise(x, y, z) + 1) / 2;
                         if (heightDelta == maxDelta) {
                             if (v > 0.5) {
-                                type = Voxel.Type.WATER;
+                                type = VoxelType.WATER;
                             } else {
-                                type = Voxel.Type.SAND;
+                                type = VoxelType.SAND;
                             }
                         } else {
-                            type = Voxel.Type.GRASS;
+                            type = VoxelType.GRASS;
                             if (
                                 x > 3 && z > 3 &&
                                 x < CHUNK_S - 4 && z < CHUNK_S - 4 &&
@@ -93,19 +114,24 @@ public class Chunk extends Drawable {
                             }
                         }
                     }
-                    data[x][y][z] = new Voxel(true, type);
+                    blocks[x][y][z] = type;
                 }
             }
         }
     }
     
+    /**
+    * method: addTree()
+    * purpose: Add a simple tree to the blocks array at a given x,y,z. Uses the
+    * addBlocks method (which includes bounds checking) to place the blocks.
+    **/
     public void addTree(int x, int y, int z) {
         int[] trunkCords = new int[] {
             x, y++, z,
             x, y++, z,
             x, y++, z
         };
-        addBlocks(trunkCords, Voxel.Type.TRUNK);
+        addBlocks(trunkCords, VoxelType.TRUNK);
         
         int[] leafCords = new int[] {
             // layer 1
@@ -133,10 +159,15 @@ public class Chunk extends Drawable {
             x, y, z+1,
             x, y++, z
         };
-        addBlocks(leafCords, Voxel.Type.LEAVES);
+        addBlocks(leafCords, VoxelType.LEAVES);
     }
     
-    public void addBlocks(int[] blockCoords, Voxel.Type type) {
+    /**
+    * method: addBlocks()
+    * purpose: Add blocks of a given type to all the x,y,z positions in the
+    * input float array. (x,y,z refer to indices of the blocks array)
+    **/
+    private void addBlocks(int[] blockCoords, VoxelType type) {
         for (int i = 0; i < blockCoords.length - 2; i+= 3) {
             int xx = blockCoords[i + 0];
             int yy = blockCoords[i + 1];
@@ -146,25 +177,36 @@ public class Chunk extends Drawable {
                 yy >= 0 && yy < CHUNK_S &&
                 zz >= 0 && zz < CHUNK_S
             ) {
-                data[xx][yy][zz] = new Voxel(true, type);
+                blocks[xx][yy][zz] = type;
             }
         }
     }
     
+    /**
+    * method: blockAt()
+    * purpose: Returns true if there is a block at the given x,y,z coordinate.
+    * x,y,z refer to world coordinates and are translated into block array
+    * indices.
+    **/
     public boolean blockAt(float x, float y, float z) {
-        int xx = CHUNK_S - (int) Math.round((x - chunkX) / CUBE_S);
-        int yy = CHUNK_S - (int) Math.round((y - chunkY) / CUBE_S);
+        int xx = CHUNK_S - (int) Math.round((x - chunkX) / BLOCK_S);
+        int yy = CHUNK_S - (int) Math.round((y - chunkY) / BLOCK_S);
         
         // block are not centered on the z axis so we truncate instead of rounding
-        int zz = CHUNK_S - (int) ((z - chunkZ) / CUBE_S);
+        int zz = CHUNK_S - (int) ((z - chunkZ) / BLOCK_S);
         
         return safeLookup(xx, yy, zz) != null;
     }
     
+    /**
+    * method: depthAt()
+    * purpose: Returns the depth at a given x,y,z coordinate. x,y,z refer to
+    * world coordinates and are translated into block array indices.
+    **/
     public float depthAt(float x, float y, float z) {
-        int xx = CHUNK_S - (int) Math.round((x - chunkX) / CUBE_S);
-        int yy = CHUNK_S - (int) Math.round((y - chunkY) / CUBE_S);
-        int zz = CHUNK_S - (int) ((z - chunkZ) / CUBE_S);
+        int xx = CHUNK_S - (int) Math.round((x - chunkX) / BLOCK_S);
+        int yy = CHUNK_S - (int) Math.round((y - chunkY) / BLOCK_S);
+        int zz = CHUNK_S - (int) ((z - chunkZ) / BLOCK_S);
         
         for (int i = yy; i >= 0; i--) {
             if (safeLookup(xx, i, zz) != null) {
@@ -175,20 +217,29 @@ public class Chunk extends Drawable {
         return CHUNK_S;
     }
     
-    public Voxel safeLookup(int x, int y, int z) {
+    /**
+    * method: safeLookup()
+    * purpose: Returns VoxelType in the x,y,z position in the blocks array. Does
+    * bounds checking.
+    **/
+    private VoxelType safeLookup(int x, int y, int z) {
         if (
             x >= 0 && x < CHUNK_S &&
             y >= 0 && y < CHUNK_S &&
             z >= 0 && z < CHUNK_S
         ) {
-            return data[x][y][z];
+            return blocks[x][y][z];
         }
         
         return null;
     }
     
+    /**
+    * method: draw()
+    * purpose: Use vertex buffers to draw the pre-built textured mesh to the
+    * screen.
+    **/
     public void draw() {
-        glPushMatrix();
         glPushMatrix();
 
         glBindBuffer(GL_ARRAY_BUFFER, VBOVertexHandle);
@@ -201,66 +252,104 @@ public class Chunk extends Drawable {
         glDrawArrays(GL_QUADS, 0, NUM_BLOCKS * 24);
         glPopMatrix();       
     }
-    
-    private Texture loadTexture(String key) {
-        try {
-            return TextureLoader.getTexture("png", new FileInputStream(new File("res/" + key + ".png")));
-        } catch (FileNotFoundException ex) {
-            Logger.getLogger(Screen.class.getName()).log(Level.SEVERE, null, ex);
-        } catch (IOException ex) {
-            Logger.getLogger(Screen.class.getName()).log(Level.SEVERE, null, ex);
-        }
-        return null;
+
+    /**
+    * method: swapMesh()
+    * purpose: flip the excludeHidden flag and then rebuild the mesh.
+    **/
+    public void swapMesh() {
+        excludeHidden = !excludeHidden;
+        rebuildMesh();
     }
     
-    private void rebuildMesh() {
+    
+    /**
+    * method: rebuildMesh()
+    * purpose: Loop over the blocks array to build a 3d mesh of the chunk to
+    * render to the screen. If the excludeHidden flag is set, faces that can not
+    * be see will not be included in the mesh.
+    **/
+    private void rebuildMesh() {        
+        int floatsPerFacePosition = 3 * 4;
+        int floatsPerFaceTexture = 2 * 4;        
+
         VBOTextureHandle = glGenBuffers();
         VBOVertexHandle = glGenBuffers();
         
-        FloatBuffer VertexPositionData = BufferUtils.createFloatBuffer(NUM_BLOCKS * 6 * 12);
-        FloatBuffer VertexTextureData = BufferUtils.createFloatBuffer(NUM_BLOCKS * 6 * 12);
-        
+        FloatBuffer VertexPositionData = BufferUtils.createFloatBuffer(NUM_BLOCKS * 6 * floatsPerFacePosition);
+        FloatBuffer VertexTextureData = BufferUtils.createFloatBuffer(NUM_BLOCKS * 6 * floatsPerFaceTexture);
+                
+        int totalFaces = 0;
         for (int x = 0; x < CHUNK_S; x++) {
             for (int z = 0; z < CHUNK_S; z++) {
                 for (int y = 0; y < CHUNK_S; y++) {
-                    Voxel v = data[x][y][z];
+                    VoxelType v = blocks[x][y][z];
                     
+                    // null is used for empty cells
                     if (v == null) {
                         continue;
                     }
 
-                    // don't add hidden voxels to the mesh
-                    boolean hidden = false;
-                    if (
-                        x > 0 && y > 0 && z > 0 &&
-                        x < CHUNK_S - 1 && y < CHUNK_S - 1 && z < CHUNK_S - 1
-                    ) {
-                        hidden = data[x+1][y][z] != null &&
-                                 data[x-1][y][z] != null &&
-                                 data[x][y+1][z] != null &&
-                                 data[x][y-1][z] != null &&
-                                 data[x][y][z+1] != null &&
-                                 data[x][y][z-1] != null;
+                    boolean[] faceVisible;
+                    if (excludeHidden) {
+                        // compute faces that can not be seen
+                        faceVisible = new boolean[] {
+                            // top & bottom
+                            !(y < CHUNK_S - 1 && blocks[x][y+1][z] != null),
+                            !(y > 0 && blocks[x][y-1][z] != null),
+                            // front & back
+                            !(z > 0 && blocks[x][y][z-1] != null),
+                            !(z < CHUNK_S - 1 && blocks[x][y][z+1] != null),
+                            // left & right
+                            !(x > 0 && blocks[x-1][y][z] != null),
+                            !(x < CHUNK_S - 1 && blocks[x+1][y][z] != null)
+                        };
+                    } else {
+                        faceVisible = new boolean[] { true, true, true, true, true, true };
                     }
                     
-                    //if (!hidden) {
-                    if (true) {
-                        VertexPositionData.put(
-                            createCube(
-                                (float) (chunkX + x * CUBE_S),
-                                (float) (y * CUBE_S - CHUNK_S * CUBE_S),
-                                (float) (chunkZ + z * CUBE_S)
-                            )
-                        );
-
-                        VertexTextureData.put(getTexture(v));
+                    // compute total number of visible faces
+                    for (int i = 0; i < faceVisible.length; i++) {
+                        if (faceVisible[i]) {
+                            totalFaces++;
+                        }
                     }
+                    
+                    // create the vertices
+                    float[] vertexPos = createCube((float) (chunkX + x * BLOCK_S),
+                                (float) (y * BLOCK_S - CHUNK_S * BLOCK_S),
+                                (float) (chunkZ + z * BLOCK_S)
+                            );
+                    float[] texturePos = getTexture(v);
+
+                    // remove hidden faces
+                    float[] vertexPosTrimmed = removeHiddenFaces(vertexPos, faceVisible, floatsPerFacePosition);
+                    float[] texturePosTrimmed = removeHiddenFaces(texturePos, faceVisible, floatsPerFaceTexture);
+
+                    // insert into vertex buffer
+                    VertexPositionData.put(vertexPosTrimmed);
+                    VertexTextureData.put(texturePosTrimmed);
                 }
             }
         }
         
-        VertexTextureData.flip();
+        // resize the float buffers (if excludeHidden is set)
+        if (excludeHidden) {
+            float[] resizedPositionData = new float[totalFaces * floatsPerFacePosition];
+            VertexPositionData.rewind();
+            VertexPositionData.get(resizedPositionData);
+            VertexPositionData = BufferUtils.createFloatBuffer(totalFaces * floatsPerFacePosition);
+            VertexPositionData.put(resizedPositionData);
+
+            float[] resizedTextureData = new float[totalFaces * floatsPerFaceTexture];
+            VertexTextureData.rewind();
+            VertexTextureData.get(resizedTextureData);
+            VertexTextureData = BufferUtils.createFloatBuffer(totalFaces * floatsPerFaceTexture);
+            VertexTextureData.put(resizedTextureData);
+        }
+        
         VertexPositionData.flip();
+        VertexTextureData.flip();
         
         glBindBuffer(GL_ARRAY_BUFFER, VBOVertexHandle);
         glBufferData(GL_ARRAY_BUFFER, VertexPositionData, GL_STATIC_DRAW);
@@ -269,28 +358,62 @@ public class Chunk extends Drawable {
         glBindBuffer(GL_ARRAY_BUFFER, VBOTextureHandle);
         glBufferData(GL_ARRAY_BUFFER, VertexTextureData, GL_STATIC_DRAW);
         glBindBuffer(GL_ARRAY_BUFFER, 0);
-}
+    }
     
+    
+    /**
+    * method: removeHiddenFaces()
+    * purpose: Delete hidden faces from the vertexArray by looking up their
+    * visibility in the faceVisible array.
+    **/
+    private static float[] removeHiddenFaces(float[] vertexArray, boolean[] faceVisible, int floatsPerFace) {
+        int totalFaces = 0;
+        for (int i = 0; i < faceVisible.length; i++) {
+            if (faceVisible[i]) {
+                totalFaces++;
+            }
+        }
+        
+        float[] output = new float[totalFaces * floatsPerFace];
+        
+        int outputArrayIndex = 0;
+        for (int i = 0; i < 6; i++) {
+            if (faceVisible[i]) {
+                for (int j = 0; j < floatsPerFace; j++) {
+                    int idx = i * floatsPerFace + j;
+                    output[outputArrayIndex++] = vertexArray[idx];
+                }
+            }
+        }
+        
+        return output;
+    }
+    
+    /**
+    * method: createCube()
+    * purpose: Return an array of float vertices that define a cube at position
+    * x,y,z.
+    **/
     private static float[] createCube(float x, float y, float z) {
-        float s = ((float) CUBE_S) / 2;
+        float s = ((float) BLOCK_S) / 2;
         return new float[] {
             // TOP QUAD
             x + s, y + s, z,
             x - s, y + s, z,
-            x - s, y + s, z - CUBE_S,
-            x + s, y + s, z - CUBE_S,
+            x - s, y + s, z - BLOCK_S,
+            x + s, y + s, z - BLOCK_S,
 
             // BOTTOM QUAD
-            x + s, y - s, z - CUBE_S,
-            x - s, y - s, z - CUBE_S,
+            x + s, y - s, z - BLOCK_S,
+            x - s, y - s, z - BLOCK_S,
             x - s, y - s, z,
             x + s, y - s, z
             ,
             // FRONT QUAD
-            x + s, y + s, z - CUBE_S,
-            x - s, y + s, z - CUBE_S,
-            x - s, y - s, z - CUBE_S,
-            x + s, y - s, z - CUBE_S,
+            x + s, y + s, z - BLOCK_S,
+            x - s, y + s, z - BLOCK_S,
+            x - s, y - s, z - BLOCK_S,
+            x + s, y - s, z - BLOCK_S,
 
             // BACK QUAD
             x + s, y - s, z,
@@ -299,26 +422,31 @@ public class Chunk extends Drawable {
             x + s, y + s, z,
 
             // LEFT QUAD
-            x - s, y + s, z - CUBE_S,
+            x - s, y + s, z - BLOCK_S,
             x - s, y + s, z,
             x - s, y - s, z,
-            x - s, y - s, z - CUBE_S,
+            x - s, y - s, z - BLOCK_S,
 
             // RIGHT QUAD
             x + s, y + s, z,
-            x + s, y + s, z - CUBE_S,
-            x + s, y - s, z - CUBE_S,
+            x + s, y + s, z - BLOCK_S,
+            x + s, y - s, z - BLOCK_S,
             x + s, y - s, z 
         };
     }
     
-    public float[] getTexture(Voxel v) {
+    /**
+    * method: getTexture()
+    * purpose: Return an array of float vertices that define the texture for
+    * a block of type v
+    **/
+    private float[] getTexture(VoxelType v) {
         float offset = (2048f/16)/2048f;
         
         int btmX, topX, fntX, bckX, lftX, rhtX;
         int btmY, topY, fntY, bckY, lftY, rhtY;
         
-        switch (v.type) {
+        switch (v) {
             case GRASS:
                 btmX = 2;
                 btmY = 9;
@@ -396,5 +524,4 @@ public class Chunk extends Drawable {
             offset*(rhtX + 0), offset*(rhtY + 1)
         };   
     }
-
 }

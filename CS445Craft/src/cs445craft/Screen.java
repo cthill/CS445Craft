@@ -4,11 +4,12 @@
 * class: CS 445 – Computer Graphics
 *
 * assignment: Final Project
-* date last modified: 10/08/2017
+* date last modified: 10/16/2017
 *
 * purpose: This class is responsible for managing the OpenGL window
 * and maintains a list of 'Drawable' objects that need to be
-* rendered on each frame. It requires a Camera object.
+* rendered on each frame. It requires a Camera object so the lookThrough method
+* can be called.
 * 
 ****************************************************************/
 package cs445craft;
@@ -44,6 +45,7 @@ public class Screen {
         glEnable(GL_TEXTURE_2D);
         glEnableClientState (GL_TEXTURE_COORD_ARRAY);
         glEnableClientState(GL_VERTEX_ARRAY);
+        glFrontFace(GL_CW);
 
         glLoadIdentity();
         glHint(GL_PERSPECTIVE_CORRECTION_HINT, GL_NICEST);
@@ -73,6 +75,7 @@ public class Screen {
         GLU.gluPerspective(100.0f, (float) width / (float) height, 0.05f, 300.0f);
         glMatrixMode(GL_MODELVIEW);
         glEnable(GL_DEPTH_TEST);
+        glEnable(GL_CULL_FACE);
         
         
         camera.lookThrough();
@@ -84,7 +87,7 @@ public class Screen {
         }
         glPopMatrix();
         
-        // 2d hud draw
+        // switch to 2d mode for hud draw
         glMatrixMode(GL_PROJECTION);
         glPushMatrix();
         glLoadIdentity();
@@ -92,6 +95,7 @@ public class Screen {
         glMatrixMode(GL_MODELVIEW);
         glLoadIdentity();
         glDisable(GL_DEPTH_TEST);
+        glDisable(GL_CULL_FACE);
         glClear(GL_DEPTH_BUFFER_BIT);
         
         // draw crosshairs
@@ -111,7 +115,7 @@ public class Screen {
         glEnd();
         glPopMatrix();
         
-
+        // update display and sync to 60 hz.
         Display.update();
         Display.sync(60);
     }

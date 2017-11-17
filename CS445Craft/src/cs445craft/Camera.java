@@ -15,6 +15,8 @@ package cs445craft;
 import static org.lwjgl.opengl.GL11.*;
 
 public class Camera {
+    private static final float minPitch = -90.0f;
+    private static final float maxPitch = 90.0f;
     public float x,y,z, yaw, pitch;
     
     public Camera(float x, float y, float z) {
@@ -39,6 +41,11 @@ public class Camera {
     **/
     public void incPitch(float pitch) {
         this.pitch -= pitch;
+        if (this.pitch < minPitch) {
+            this.pitch = minPitch;
+        } else if (this.pitch > maxPitch) {
+            this.pitch = maxPitch;
+        }
     }
     
     /**

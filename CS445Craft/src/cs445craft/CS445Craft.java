@@ -199,7 +199,8 @@ public class CS445Craft {
         Screen s;
         try {
             Camera c = new Camera(0,0,0);
-            s = new Screen(1024, 768, "CS445Craft", c);
+            //s = new Screen(1024, 768, "CS445Craft", c);
+            s = new Screen(640, 480, "CS445Craft", c);
             init(s);
             run(s, c);
         } catch (LWJGLException ex) {

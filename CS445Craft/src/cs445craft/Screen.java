@@ -14,6 +14,7 @@
 ****************************************************************/
 package cs445craft;
 
+import java.awt.Font;
 import java.util.ArrayList;
 import java.util.List;
 import org.lwjgl.LWJGLException;
@@ -21,12 +22,16 @@ import org.lwjgl.opengl.Display;
 import org.lwjgl.opengl.DisplayMode;
 import static org.lwjgl.opengl.GL11.*;
 import org.lwjgl.util.glu.GLU;
+import org.newdawn.slick.Color;
+import org.newdawn.slick.TrueTypeFont;
 
 public class Screen {
-    protected int width, height;
-    protected String title;
-    protected Camera camera;
-    protected List<Drawable> objects;
+    private int width, height;
+    private String title;
+    private Camera camera;
+    private List<Drawable> objects;
+    private Font awtFont;
+    private TrueTypeFont font;
     
     public Screen(int width, int height, String title, Camera camera) throws LWJGLException {
         this.width = width;
@@ -35,20 +40,26 @@ public class Screen {
         this.camera = camera;
         objects = new ArrayList<>();
         
+
+        
         // create window
         Display.setFullscreen(false);
         Display.setDisplayMode(new DisplayMode(width, height));
         Display.setTitle(title);
         Display.create();
         
-        glClearColor(0.5f, 0.85f, 1.0f, 0.0f);
+        glClearColor(0.5f, 0.85f, 1.0f, 1.0f);
+        
+        
         glEnable(GL_TEXTURE_2D);
+        glEnable(GL_BLEND);
         glEnableClientState (GL_TEXTURE_COORD_ARRAY);
         glEnableClientState(GL_VERTEX_ARRAY);
-        glFrontFace(GL_CW);
-
-        glLoadIdentity();
-        glHint(GL_PERSPECTIVE_CORRECTION_HINT, GL_NICEST);
+        glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
+        glFrontFace(GL_CW);        
+        
+//        awtFont = new Font("Times New Roman", Font.PLAIN, 24);
+//        font = new TrueTypeFont(awtFont, false);
     }
 
     /**
@@ -66,22 +77,22 @@ public class Screen {
     * and rendering each one.
     **/
     public void drawFrame() {
-        // 3d draw
-        
-        glColor3f(1.0f,1.0f,1.0f);
+        // setup 3d config
+        glEnable(GL_DEPTH_TEST);
+        glEnable(GL_CULL_FACE);
+        glDisable(GL_BLEND);
         glMatrixMode(GL_PROJECTION);
-        glPushMatrix();
         glLoadIdentity();
         GLU.gluPerspective(100.0f, (float) width / (float) height, 0.05f, 300.0f);
         glMatrixMode(GL_MODELVIEW);
-        glEnable(GL_DEPTH_TEST);
-        glEnable(GL_CULL_FACE);
-        
-        
-        camera.lookThrough();
-        
+        glHint(GL_PERSPECTIVE_CORRECTION_HINT, GL_NICEST);
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
         
+        // 3d draw
+        glColor3f(1.0f,1.0f,1.0f);
+        glLoadIdentity();
+        glPushMatrix();
+        camera.lookThrough();
         for (Drawable object: objects) {
             object.draw();
         }
@@ -89,16 +100,17 @@ public class Screen {
         
         // switch to 2d mode for hud draw
         glMatrixMode(GL_PROJECTION);
-        glPushMatrix();
         glLoadIdentity();
         glOrtho(-width/2, width/2, -height/2, height/2, 1, -1);
         glMatrixMode(GL_MODELVIEW);
-        glLoadIdentity();
         glDisable(GL_DEPTH_TEST);
         glDisable(GL_CULL_FACE);
+        glEnable(GL_BLEND);
         glClear(GL_DEPTH_BUFFER_BIT);
         
         // draw crosshairs
+        glLoadIdentity();
+        glPushMatrix();
         glBindTexture(GL_TEXTURE_2D, 0);
         glColor3f(1.0f, 1.0f, 1.0f);
         glPointSize(2);
@@ -114,6 +126,9 @@ public class Screen {
             glVertex2f(0,-4);
         glEnd();
         glPopMatrix();
+        
+//        font = new TrueTypeFont(awtFont, false);
+//        font.drawString(0,0, "TESTING", Color.yellow);
         
         // update display and sync to 60 hz.
         Display.update();

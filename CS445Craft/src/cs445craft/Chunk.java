@@ -27,12 +27,13 @@ import org.newdawn.slick.opengl.Texture;
 import org.newdawn.slick.opengl.TextureLoader;
 
 public class Chunk implements Drawable {
-    public static final int BLOCK_S = 2;
-    public static final int CHUNK_S = 30; // 30 x 30 x 30 chunk
-    public static final int HEADROOM = 5;
-    public static final int NUM_BLOCKS = CHUNK_S * CHUNK_S * CHUNK_S;
+    public static final int BLOCK_SIZE = 2;
+    private int chunkSize;
+    private int chunkHeight;
+    private int numBlocks;
+    private int numVisibleFaces;
     
-    private enum VoxelType {
+    public enum VoxelType {
         GRASS,
         SAND,
         WATER,
@@ -44,7 +45,6 @@ public class Chunk implements Drawable {
     }
     
     public float chunkX, chunkY, chunkZ;
-    private Random rand;
     private VoxelType[][][] blocks;
     
     private int VBOVertexHandle;
@@ -52,114 +52,20 @@ public class Chunk implements Drawable {
     private Texture texture;
     private boolean excludeHidden;
     
-    public Chunk(float chunkX, float chunkY, float chunkZ) throws IOException {
+    public Chunk(float chunkX, float chunkY, float chunkZ, int chunkSize, int chunkHeight) throws IOException {
         this.chunkX = chunkX;
         this.chunkY = chunkY;
         this.chunkZ = chunkZ;
+        this.chunkSize = chunkSize;
+        this.chunkHeight = chunkHeight;
+        this.numBlocks = chunkSize * chunkHeight * chunkSize;
         
-        rand = new Random();
-        blocks = new VoxelType[CHUNK_S][CHUNK_S][CHUNK_S];
+        
+        blocks = new VoxelType[chunkSize][chunkHeight][chunkSize];
         
         texture = TextureLoader.getTexture("png", new FileInputStream(new File("res/terrain.png")));
 
-        excludeHidden = false;
-        generateRandomChunk();
-        rebuildMesh();
-    }
-    
-    /**
-    * method: generateRandomChunk()
-    * purpose: Use simplex noise to fill the blocks array with blocks. Also adds
-    * trees at random.
-    **/
-    private void generateRandomChunk() {
-        int maxDelta = 6;
-        SimplexNoise noiseGenHeight = new SimplexNoise(30, 0.35, rand.nextInt());
-        SimplexNoise noiseGenType = new SimplexNoise(15, .1, rand.nextInt());
-        
-        for (int x = 0; x < CHUNK_S; x++) {
-            for (int z = 0; z < CHUNK_S; z++) {
-                double noise = noiseGenHeight.getNoise(x, z);
-                int heightDelta =(int) (maxDelta * noise + maxDelta) - 1;
-                if (heightDelta > maxDelta) {
-                    heightDelta = maxDelta;
-                }
-                
-                int maxHeight = CHUNK_S - heightDelta - HEADROOM;
-                for (int y = 0; y < maxHeight; y++) {
-                    VoxelType type = VoxelType.BEDROCK;
-                    
-                    if (y < maxHeight - 1) {
-                        if (y > 2 && y < CHUNK_S / 2) {
-                            type = VoxelType.STONE;
-                        } else if (y >= CHUNK_S / 2) {
-                            type = VoxelType.DIRT;
-                        }
-                    } else {
-                        float v = (float) (noiseGenType.getNoise(x, y, z) + 1) / 2;
-                        if (heightDelta == maxDelta) {
-                            if (v > 0.5) {
-                                type = VoxelType.WATER;
-                            } else {
-                                type = VoxelType.SAND;
-                            }
-                        } else {
-                            type = VoxelType.GRASS;
-                            if (
-                                x > 3 && z > 3 &&
-                                x < CHUNK_S - 4 && z < CHUNK_S - 4 &&
-                                rand.nextDouble() < 0.005
-                            ) {
-                                addTree(x,y + 1,z);
-                            }
-                        }
-                    }
-                    blocks[x][y][z] = type;
-                }
-            }
-        }
-    }
-    
-    /**
-    * method: addTree()
-    * purpose: Add a simple tree to the blocks array at a given x,y,z. Uses the
-    * addBlocks method (which includes bounds checking) to place the blocks.
-    **/
-    public void addTree(int x, int y, int z) {
-        int[] trunkCords = new int[] {
-            x, y++, z,
-            x, y++, z,
-            x, y++, z
-        };
-        addBlocks(trunkCords, VoxelType.TRUNK);
-        
-        int[] leafCords = new int[] {
-            // layer 1
-            x+1, y, z,
-            x-1, y, z,
-            x, y, z-1,
-            x, y, z+1,
-            x, y++, z,
-
-            // layer 2
-            x+1, y, z,
-            x-1, y, z,
-            x, y, z-1,
-            x, y, z+1,
-            x+1, y, z+1,
-            x-1, y, z+1,
-            x+1, y, z-1,
-            x-1, y, z-1,
-            x, y++, z,
-
-            // layer 3
-            x+1, y, z,
-            x-1, y, z,
-            x, y, z-1,
-            x, y, z+1,
-            x, y++, z
-        };
-        addBlocks(leafCords, VoxelType.LEAVES);
+        excludeHidden = true;
     }
     
     /**
@@ -167,54 +73,56 @@ public class Chunk implements Drawable {
     * purpose: Add blocks of a given type to all the x,y,z positions in the
     * input float array. (x,y,z refer to indices of the blocks array)
     **/
-    private void addBlocks(int[] blockCoords, VoxelType type) {
-        for (int i = 0; i < blockCoords.length - 2; i+= 3) {
-            int xx = blockCoords[i + 0];
-            int yy = blockCoords[i + 1];
-            int zz = blockCoords[i + 2];
-            if (
-                xx >= 0 && xx < CHUNK_S &&
-                yy >= 0 && yy < CHUNK_S &&
-                zz >= 0 && zz < CHUNK_S
-            ) {
-                blocks[xx][yy][zz] = type;
+//    private void addBlocks(int[] blockCoords, VoxelType type) {
+//        for (int i = 0; i < blockCoords.length - 2; i+= 3) {
+//            int xx = blockCoords[i + 0];
+//            int yy = blockCoords[i + 1];
+//            int zz = blockCoords[i + 2];
+//            if (
+//                xx >= 0 && xx < chunkSize &&
+//                yy >= 0 && yy < chunkSize &&
+//                zz >= 0 && zz < chunkSize
+//            ) {
+//                blocks[xx][yy][zz] = type;
+//            }
+//        }
+//    }
+    
+    public void copyBlocks(VoxelType[][][] wBlocks, int sx, int lx, int sy, int ly, int sz, int lz) {
+        if (lx > chunkSize)
+            lx = chunkSize;
+        if (ly > chunkHeight)
+            ly = chunkHeight;
+        if (lz > chunkSize)
+            lz = chunkSize;
+        
+        int x = 0;
+        for (int ix = sx; ix < sx + lx; ix++) {
+            int y = 0;
+            for (int iy = sy; iy < sy + ly; iy++) {
+                int z = 0;
+                for (int iz = sz; iz < sz + lz; iz++) {
+                    this.blocks[x][y][z] = wBlocks[ix][iy][iz];
+                    z++;
+                }
+                y++;
             }
+            x++;
         }
     }
-    
-    /**
-    * method: blockAt()
-    * purpose: Returns true if there is a block at the given x,y,z coordinate.
-    * x,y,z refer to world coordinates and are translated into block array
-    * indices.
-    **/
-    public boolean blockAt(float x, float y, float z) {
-        int xx = CHUNK_S - (int) Math.round((x - chunkX) / BLOCK_S);
-        int yy = CHUNK_S - (int) Math.round((y - chunkY) / BLOCK_S);
-        
-        // block are not centered on the z axis so we truncate instead of rounding
-        int zz = CHUNK_S - (int) ((z - chunkZ) / BLOCK_S);
-        
-        return safeLookup(xx, yy, zz) != null;
+
+    public boolean blockAt(int x, int y, int z) {
+        return safeLookup(x, y, z) != null; 
     }
     
-    /**
-    * method: depthAt()
-    * purpose: Returns the depth at a given x,y,z coordinate. x,y,z refer to
-    * world coordinates and are translated into block array indices.
-    **/
-    public float depthAt(float x, float y, float z) {
-        int xx = CHUNK_S - (int) Math.round((x - chunkX) / BLOCK_S);
-        int yy = CHUNK_S - (int) Math.round((y - chunkY) / BLOCK_S);
-        int zz = CHUNK_S - (int) ((z - chunkZ) / BLOCK_S);
-        
-        for (int i = yy; i >= 0; i--) {
-            if (safeLookup(xx, i, zz) != null) {
+    public float depthAt(int x, int y, int z) {
+        for (int i = y; i >= 0; i--) {
+            if (safeLookup(x, i, z) != null) {
                 return i;
             }
         }
         
-        return CHUNK_S;
+        return chunkHeight;
     }
     
     /**
@@ -224,9 +132,9 @@ public class Chunk implements Drawable {
     **/
     private VoxelType safeLookup(int x, int y, int z) {
         if (
-            x >= 0 && x < CHUNK_S &&
-            y >= 0 && y < CHUNK_S &&
-            z >= 0 && z < CHUNK_S
+            x >= 0 && x < chunkSize &&
+            y >= 0 && y < chunkHeight &&
+            z >= 0 && z < chunkSize
         ) {
             return blocks[x][y][z];
         }
@@ -249,8 +157,8 @@ public class Chunk implements Drawable {
         glBindTexture(GL_TEXTURE_2D, 1);
         glTexCoordPointer(2, GL_FLOAT, 0, 0L);
 
-        glDrawArrays(GL_QUADS, 0, NUM_BLOCKS * 24);
-        glPopMatrix();       
+        glDrawArrays(GL_QUADS, 0, numVisibleFaces * 4);
+        glPopMatrix();   
     }
 
     /**
@@ -269,20 +177,30 @@ public class Chunk implements Drawable {
     * render to the screen. If the excludeHidden flag is set, faces that can not
     * be see will not be included in the mesh.
     **/
-    private void rebuildMesh() {        
+    public void rebuildMesh() {
+        if (true) {
+            for (int i = 0; i < chunkSize; i++) {
+                blocks[i][chunkHeight - 1][0] = VoxelType.BEDROCK;
+                blocks[0][chunkHeight - 1][i] = VoxelType.BEDROCK;
+                blocks[i][chunkHeight - 1][chunkSize - 1] = VoxelType.BEDROCK;
+                blocks[chunkSize - 1][chunkHeight - 1][i] = VoxelType.BEDROCK;
+            }
+        }
+        
         int floatsPerFacePosition = 3 * 4;
         int floatsPerFaceTexture = 2 * 4;        
 
-        VBOTextureHandle = glGenBuffers();
-        VBOVertexHandle = glGenBuffers();
         
-        FloatBuffer VertexPositionData = BufferUtils.createFloatBuffer(NUM_BLOCKS * 6 * floatsPerFacePosition);
-        FloatBuffer VertexTextureData = BufferUtils.createFloatBuffer(NUM_BLOCKS * 6 * floatsPerFaceTexture);
+        VBOVertexHandle = glGenBuffers();
+        VBOTextureHandle = glGenBuffers();
+        
+        FloatBuffer VertexPositionData = BufferUtils.createFloatBuffer(numBlocks * 6 * floatsPerFacePosition);
+        FloatBuffer VertexTextureData = BufferUtils.createFloatBuffer(numBlocks * 6 * floatsPerFaceTexture);
                 
         int totalFaces = 0;
-        for (int x = 0; x < CHUNK_S; x++) {
-            for (int z = 0; z < CHUNK_S; z++) {
-                for (int y = 0; y < CHUNK_S; y++) {
+        for (int x = 0; x < chunkSize; x++) {
+            for (int z = 0; z < chunkSize; z++) {
+                for (int y = 0; y < chunkHeight; y++) {
                     VoxelType v = blocks[x][y][z];
                     
                     // null is used for empty cells
@@ -295,14 +213,14 @@ public class Chunk implements Drawable {
                         // compute faces that can not be seen
                         faceVisible = new boolean[] {
                             // top & bottom
-                            !(y < CHUNK_S - 1 && blocks[x][y+1][z] != null),
+                            !(y < chunkHeight - 1 && blocks[x][y+1][z] != null),
                             !(y > 0 && blocks[x][y-1][z] != null),
                             // front & back
                             !(z > 0 && blocks[x][y][z-1] != null),
-                            !(z < CHUNK_S - 1 && blocks[x][y][z+1] != null),
+                            !(z < chunkSize - 1 && blocks[x][y][z+1] != null),
                             // left & right
                             !(x > 0 && blocks[x-1][y][z] != null),
-                            !(x < CHUNK_S - 1 && blocks[x+1][y][z] != null)
+                            !(x < chunkSize - 1 && blocks[x+1][y][z] != null)
                         };
                     } else {
                         faceVisible = new boolean[] { true, true, true, true, true, true };
@@ -316,9 +234,9 @@ public class Chunk implements Drawable {
                     }
                     
                     // create the vertices
-                    float[] vertexPos = createCube((float) (chunkX + x * BLOCK_S),
-                                (float) (y * BLOCK_S - CHUNK_S * BLOCK_S),
-                                (float) (chunkZ + z * BLOCK_S)
+                    float[] vertexPos = createCube((float) (chunkX + x * BLOCK_SIZE),
+                                (float) (y * BLOCK_SIZE - chunkHeight * BLOCK_SIZE),
+                                (float) (chunkZ + z * BLOCK_SIZE)
                             );
                     float[] texturePos = getTexture(v);
 
@@ -332,6 +250,8 @@ public class Chunk implements Drawable {
                 }
             }
         }
+        
+        numVisibleFaces = totalFaces;
         
         // resize the float buffers (if excludeHidden is set)
         if (excludeHidden) {
@@ -395,43 +315,43 @@ public class Chunk implements Drawable {
     * x,y,z.
     **/
     private static float[] createCube(float x, float y, float z) {
-        float s = ((float) BLOCK_S) / 2;
+        float s = ((float) BLOCK_SIZE) / 2;
         return new float[] {
             // TOP QUAD
-            x + s, y + s, z,
-            x - s, y + s, z,
-            x - s, y + s, z - BLOCK_S,
-            x + s, y + s, z - BLOCK_S,
+            x + s, y + s, z + s,
+            x - s, y + s, z + s,
+            x - s, y + s, z - s,
+            x + s, y + s, z - s,
 
             // BOTTOM QUAD
-            x + s, y - s, z - BLOCK_S,
-            x - s, y - s, z - BLOCK_S,
-            x - s, y - s, z,
-            x + s, y - s, z
+            x + s, y - s, z - s,
+            x - s, y - s, z - s,
+            x - s, y - s, z + s,
+            x + s, y - s, z + s
             ,
             // FRONT QUAD
-            x + s, y + s, z - BLOCK_S,
-            x - s, y + s, z - BLOCK_S,
-            x - s, y - s, z - BLOCK_S,
-            x + s, y - s, z - BLOCK_S,
+            x + s, y + s, z - s,
+            x - s, y + s, z - s,
+            x - s, y - s, z - s,
+            x + s, y - s, z - s,
 
             // BACK QUAD
-            x + s, y - s, z,
-            x - s, y - s, z,
-            x - s, y + s, z,
-            x + s, y + s, z,
+            x + s, y - s, z + s,
+            x - s, y - s, z + s,
+            x - s, y + s, z + s,
+            x + s, y + s, z + s,
 
             // LEFT QUAD
-            x - s, y + s, z - BLOCK_S,
-            x - s, y + s, z,
-            x - s, y - s, z,
-            x - s, y - s, z - BLOCK_S,
+            x - s, y + s, z - s,
+            x - s, y + s, z + s,
+            x - s, y - s, z + s,
+            x - s, y - s, z - s,
 
             // RIGHT QUAD
-            x + s, y + s, z,
-            x + s, y + s, z - BLOCK_S,
-            x + s, y - s, z - BLOCK_S,
-            x + s, y - s, z 
+            x + s, y + s, z + s,
+            x + s, y + s, z - s,
+            x + s, y - s, z - s,
+            x + s, y - s, z + s
         };
     }
     

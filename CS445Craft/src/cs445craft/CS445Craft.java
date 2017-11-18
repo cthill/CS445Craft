@@ -42,19 +42,25 @@ public class CS445Craft {
         Mouse.setGrabbed(true);
         
         boolean noClip = false;
+        float noClipSpeedFactor = 5.0f;
         float mouseSens = 0.09f;
-        float speed = .75f;
+        float speed = .20f;
         float gravity = 0.025f;
-        float terminalVelocity = speed * 15;
+        float terminalVelocity = speed * 5;
         float jumpSpeed = 0.40f;
         float yspeed = 0.0f;
         
         // player is 1.5 blocks tall, so yOffset = Chunk.CUBE_S * 1.5;
         float playerHeight = Chunk.BLOCK_SIZE * 1.5f;
-//        float yOffsetSideCollide = Chunk.BLOCK_SIZE / 2.0f;
+        float sideCollideHeightFactor = 0.75f;
         boolean lastSpaceState = false; // last state of the spacebar (true == pressed)
         boolean lastVState = false;
         boolean lastRState = false;
+        
+        int chunki = 0;
+        int chunkj = 0;
+        int indexx = 0;
+        int indexz = 0;
         
         while(true) {
             // listen for q key
@@ -68,10 +74,41 @@ public class CS445Craft {
                 break;
             }
             
+            boolean updated = false;
+            if (w.worldPosToBlockIndex(camera.x) != indexx) {
+                updated = true;
+                indexx = w.worldPosToBlockIndex(camera.x);
+            }
+            
+            if (w.worldPosToBlockIndex(camera.z) != indexz) {
+                updated = true;
+                indexz = w.worldPosToBlockIndex(camera.z);
+            }
+            
+            if (w.blockIndexToChunkNum(indexx) != chunki) {
+                updated = true;
+                chunki = w.blockIndexToChunkNum(indexx);
+            }
+            
+            if (w.blockIndexToChunkNum(indexz) != chunkj) {
+                updated = true;
+                chunkj = w.blockIndexToChunkNum(indexz);
+            }
+            
+            if (updated) {
+                System.out.println("New pos (" + indexx + "," + indexz + ") chunk (" + chunki + "," + chunkj + ")");
+            }
+            
             if (Keyboard.isKeyDown(Keyboard.KEY_V)) {
                 if (!lastVState) {
                     lastVState = true;
-                    noClip = !noClip;
+                    if (!noClip) {
+                        noClip = true;
+                        speed *= noClipSpeedFactor;
+                    } else {
+                        noClip = false;
+                        speed /= noClipSpeedFactor;
+                    }
                 }
             } else {
                 lastVState = false;
@@ -86,7 +123,6 @@ public class CS445Craft {
                 lastRState = false;
             }
             
-            //Chunk currentChunk = coordsToChunk(camera.x, camera.z);
             float dx = 0.0f;
             float dz = 0.0f;
             
@@ -95,7 +131,7 @@ public class CS445Craft {
             // gravity and jumping
             // listen for jump
             boolean blockBelow = w.blockAt(camera.x, camera.y + dy + playerHeight, camera.z);
-            boolean blockAbove = w.blockAt(camera.x, camera.y + dy, camera.z);
+            boolean blockAbove = w.blockAt(camera.x, camera.y + dy - 0.5f, camera.z);
             
             if (noClip) {
                 // skip gravity code if noclip is enabled
@@ -105,20 +141,18 @@ public class CS445Craft {
                     camera.y += speed;
                 dy = 0;
                 yspeed = 0;
-            } else if (blockAbove || blockBelow) {
-                // prevent player from getting stuck in floor if they have high y speed
-                float wouldBeY = camera.y + dy;
-                
-                float nearestSnapY = Math.round(camera.y);
-                
-                float overshoot = ((float) Math.floor(dy)) / 2.0f;
-                float rounded = Math.round(camera.y + dy);
-                camera.y = rounded - overshoot - playerHeight;
-                
-                // set yspeed and dy to 0 
+            }  else if (blockBelow) {
                 yspeed = 0;
                 dy = 0;
-            } else {                
+                // prevent player from getting stuck in floor if they have high y speed
+                float depth = w.depthAt(camera.x, camera.y, camera.z);
+                camera.y = World.CHUNK_H * Chunk.BLOCK_SIZE - depth * Chunk.BLOCK_SIZE - playerHeight - .75f;
+                //camera.y = Math.round(camera.y - 0.5f);
+            } else {
+                if (blockAbove && yspeed < 0) {
+                    yspeed = 0;
+                }
+                
                 // accelerate on the yaxis for the next frame
                 yspeed += gravity;
                 if (yspeed > terminalVelocity) {
@@ -154,30 +188,42 @@ public class CS445Craft {
                 dz += -speed * (float)Math.cos(Math.toRadians(camera.yaw-90));
             }
             
-            float offsetX, offsetZ;
+            float offsetX, offsetZ, offsetXZ;
             offsetX = offsetZ = 0.0f;
-
-            // player is 2 blocks tall, so we must check side collision twice on each axis
-            boolean willCollideX = w.blockAt(camera.x + dx + offsetX, camera.y + playerHeight, camera.z + offsetZ);
-                   willCollideX |= w.blockAt(camera.x + dx + offsetX, camera.y + playerHeight - 1.0f, camera.z + offsetZ);
-                   willCollideX |= w.blockAt(camera.x + dx + offsetX, camera.y + playerHeight - 2.0f, camera.z + offsetZ);
+            offsetXZ = Chunk.BLOCK_SIZE / 3.75f;
             
-            boolean willCollideZ = w.blockAt(camera.x + offsetX, camera.y + playerHeight, camera.z + dz + offsetZ);
-                   willCollideZ |= w.blockAt(camera.x + offsetX, camera.y + playerHeight - 1.0f, camera.z + dz + offsetZ);
-                   willCollideZ |= w.blockAt(camera.x + offsetX, camera.y + playerHeight - 2.0f, camera.z + dz + offsetZ);
+            if (dx > 0) {
+                offsetX = offsetXZ;
+            } else if (dx < 0) {
+                offsetX = -offsetXZ;
+            }
+            
+            if (dz > 0) {
+                offsetZ = offsetXZ;
+            } else if (dz < 0) {
+                offsetZ = -offsetXZ;
+            }
+
+            // player is ~2 blocks tall, so we must check side collision twice on each axis
+            float offsetY = playerHeight * sideCollideHeightFactor;
+            boolean willCollideX = w.blockAt(camera.x + dx + offsetX, camera.y + offsetY, camera.z);
+                   willCollideX |= w.blockAt(camera.x + dx + offsetX, camera.y + offsetY - Chunk.BLOCK_SIZE, camera.z);
+            boolean willCollideZ = w.blockAt(camera.x, camera.y + offsetY, camera.z + dz + offsetZ);
+                   willCollideZ |= w.blockAt(camera.x, camera.y + offsetY - Chunk.BLOCK_SIZE, camera.z + dz + offsetZ);
+                   
+            // special case for when running directly into a corner
+            boolean willCollideXZ = w.blockAt(camera.x + dx + offsetX, camera.y + offsetY, camera.z + dz + offsetZ);
+                   willCollideXZ |= w.blockAt(camera.x + dx + offsetX, camera.y + offsetY - Chunk.BLOCK_SIZE, camera.z + dz + offsetZ);
+                   
+            if (willCollideXZ && !willCollideX && !willCollideZ && !noClip) {
+                dx = 0;
+                dz = 0;
+            }
                     
             if (willCollideX && !noClip) {
-                float overshoot = (float) Math.floor(dx) / 2.0f;
-                if (Math.abs(overshoot) > 0) {
-                    camera.x = Math.round(camera.x + dx - overshoot);
-                }
                 dx = 0;
             }
             if (willCollideZ && !noClip) {
-                float overshoot = (float) Math.floor(dz) / 2.0f;
-                if (Math.abs(overshoot) > 0) {
-                    camera.z = Math.round(camera.z + dz - overshoot);
-                }
                 dz = 0;
             }
             

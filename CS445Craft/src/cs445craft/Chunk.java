@@ -19,7 +19,6 @@ import java.io.File;
 import java.io.FileInputStream;
 import java.io.IOException;
 import java.nio.FloatBuffer;
-import java.util.Random;
 import org.lwjgl.BufferUtils;
 import static org.lwjgl.opengl.GL11.*;
 import static org.lwjgl.opengl.GL15.*;
@@ -67,26 +66,6 @@ public class Chunk implements Drawable {
 
         excludeHidden = true;
     }
-    
-    /**
-    * method: addBlocks()
-    * purpose: Add blocks of a given type to all the x,y,z positions in the
-    * input float array. (x,y,z refer to indices of the blocks array)
-    **/
-//    private void addBlocks(int[] blockCoords, VoxelType type) {
-//        for (int i = 0; i < blockCoords.length - 2; i+= 3) {
-//            int xx = blockCoords[i + 0];
-//            int yy = blockCoords[i + 1];
-//            int zz = blockCoords[i + 2];
-//            if (
-//                xx >= 0 && xx < chunkSize &&
-//                yy >= 0 && yy < chunkSize &&
-//                zz >= 0 && zz < chunkSize
-//            ) {
-//                blocks[xx][yy][zz] = type;
-//            }
-//        }
-//    }
     
     public void copyBlocks(VoxelType[][][] wBlocks, int sx, int lx, int sy, int ly, int sz, int lz) {
         if (lx > chunkSize)
@@ -178,7 +157,7 @@ public class Chunk implements Drawable {
     * be see will not be included in the mesh.
     **/
     public void rebuildMesh() {
-        if (true) {
+        if (false) {
             for (int i = 0; i < chunkSize; i++) {
                 blocks[i][chunkHeight - 1][0] = VoxelType.BEDROCK;
                 blocks[0][chunkHeight - 1][i] = VoxelType.BEDROCK;
@@ -190,25 +169,23 @@ public class Chunk implements Drawable {
         int floatsPerFacePosition = 3 * 4;
         int floatsPerFaceTexture = 2 * 4;        
 
-        
-        VBOVertexHandle = glGenBuffers();
-        VBOTextureHandle = glGenBuffers();
-        
-        FloatBuffer VertexPositionData = BufferUtils.createFloatBuffer(numBlocks * 6 * floatsPerFacePosition);
-        FloatBuffer VertexTextureData = BufferUtils.createFloatBuffer(numBlocks * 6 * floatsPerFaceTexture);
-                
+        int writeIndexPosition = 0;
+        int writeIndexTexture = 0;
+        float[] positionData = new float[numBlocks * 6 * floatsPerFacePosition];
+        float[] textureData = new float[numBlocks * 6 * floatsPerFaceTexture];
+
         int totalFaces = 0;
         for (int x = 0; x < chunkSize; x++) {
             for (int z = 0; z < chunkSize; z++) {
-                for (int y = 0; y < chunkHeight; y++) {
-                    VoxelType v = blocks[x][y][z];
+                for (int y = chunkHeight - 1; y >= 0; y--) {
+                    VoxelType voxelType = blocks[x][y][z];
                     
                     // null is used for empty cells
-                    if (v == null) {
+                    if (voxelType == null) {
                         continue;
                     }
 
-                    boolean[] faceVisible;
+                    boolean[] faceVisible = new boolean[] { true, true, true, true, true, true };
                     if (excludeHidden) {
                         // compute faces that can not be seen
                         faceVisible = new boolean[] {
@@ -222,54 +199,43 @@ public class Chunk implements Drawable {
                             !(x > 0 && blocks[x-1][y][z] != null),
                             !(x < chunkSize - 1 && blocks[x+1][y][z] != null)
                         };
-                    } else {
-                        faceVisible = new boolean[] { true, true, true, true, true, true };
                     }
                     
                     // compute total number of visible faces
+                    int cubeFaces = 0;
                     for (int i = 0; i < faceVisible.length; i++) {
                         if (faceVisible[i]) {
                             totalFaces++;
+                            cubeFaces++;
                         }
                     }
                     
-                    // create the vertices
-                    float[] vertexPos = createCube((float) (chunkX + x * BLOCK_SIZE),
-                                (float) (y * BLOCK_SIZE - chunkHeight * BLOCK_SIZE),
-                                (float) (chunkZ + z * BLOCK_SIZE)
-                            );
-                    float[] texturePos = getTexture(v);
-
-                    // remove hidden faces
-                    float[] vertexPosTrimmed = removeHiddenFaces(vertexPos, faceVisible, floatsPerFacePosition);
-                    float[] texturePosTrimmed = removeHiddenFaces(texturePos, faceVisible, floatsPerFaceTexture);
-
-                    // insert into vertex buffer
-                    VertexPositionData.put(vertexPosTrimmed);
-                    VertexTextureData.put(texturePosTrimmed);
+                    if (cubeFaces == 0) {
+                        continue;
+                    }
+                    
+                    // write cube position vertex data
+                    float blockX = (float) (chunkX + x * BLOCK_SIZE);
+                    float blockY = (float) (y * BLOCK_SIZE - chunkHeight * BLOCK_SIZE);
+                    float blockZ = (float) (chunkZ + z * BLOCK_SIZE);
+                    createCube(positionData, writeIndexPosition, faceVisible, blockX, blockY, blockZ);
+                    writeIndexPosition += cubeFaces * floatsPerFacePosition;
+                    
+                    // write cube texture vertex data
+                    textureCube(textureData, writeIndexTexture, faceVisible, voxelType);
+                    writeIndexTexture += cubeFaces * floatsPerFaceTexture;
                 }
             }
         }
-        
         numVisibleFaces = totalFaces;
         
-        // resize the float buffers (if excludeHidden is set)
-        if (excludeHidden) {
-            float[] resizedPositionData = new float[totalFaces * floatsPerFacePosition];
-            VertexPositionData.rewind();
-            VertexPositionData.get(resizedPositionData);
-            VertexPositionData = BufferUtils.createFloatBuffer(totalFaces * floatsPerFacePosition);
-            VertexPositionData.put(resizedPositionData);
-
-            float[] resizedTextureData = new float[totalFaces * floatsPerFaceTexture];
-            VertexTextureData.rewind();
-            VertexTextureData.get(resizedTextureData);
-            VertexTextureData = BufferUtils.createFloatBuffer(totalFaces * floatsPerFaceTexture);
-            VertexTextureData.put(resizedTextureData);
-        }
+        VBOVertexHandle = glGenBuffers();
+        VBOTextureHandle = glGenBuffers();
+        FloatBuffer VertexPositionData = BufferUtils.createFloatBuffer(totalFaces * floatsPerFacePosition);
+        FloatBuffer VertexTextureData = BufferUtils.createFloatBuffer(totalFaces * floatsPerFaceTexture);
         
-        VertexPositionData.flip();
-        VertexTextureData.flip();
+        ((FloatBuffer) VertexPositionData.clear()).put(positionData, 0, totalFaces * floatsPerFacePosition).flip();
+        ((FloatBuffer) VertexTextureData.clear()).put(textureData, 0, totalFaces * floatsPerFaceTexture).flip();
         
         glBindBuffer(GL_ARRAY_BUFFER, VBOVertexHandle);
         glBufferData(GL_ARRAY_BUFFER, VertexPositionData, GL_STATIC_DRAW);
@@ -279,80 +245,83 @@ public class Chunk implements Drawable {
         glBufferData(GL_ARRAY_BUFFER, VertexTextureData, GL_STATIC_DRAW);
         glBindBuffer(GL_ARRAY_BUFFER, 0);
     }
-    
-    
-    /**
-    * method: removeHiddenFaces()
-    * purpose: Delete hidden faces from the vertexArray by looking up their
-    * visibility in the faceVisible array.
-    **/
-    private static float[] removeHiddenFaces(float[] vertexArray, boolean[] faceVisible, int floatsPerFace) {
-        int totalFaces = 0;
-        for (int i = 0; i < faceVisible.length; i++) {
-            if (faceVisible[i]) {
-                totalFaces++;
-            }
-        }
-        
-        float[] output = new float[totalFaces * floatsPerFace];
-        
-        int outputArrayIndex = 0;
-        for (int i = 0; i < 6; i++) {
-            if (faceVisible[i]) {
-                for (int j = 0; j < floatsPerFace; j++) {
-                    int idx = i * floatsPerFace + j;
-                    output[outputArrayIndex++] = vertexArray[idx];
-                }
-            }
-        }
-        
-        return output;
-    }
+
     
     /**
     * method: createCube()
     * purpose: Return an array of float vertices that define a cube at position
     * x,y,z.
     **/
-    private static float[] createCube(float x, float y, float z) {
+    
+    private static void createCube(float[] buff, int startIndex, boolean[] faceVisible, float x, float y, float z) {
         float s = ((float) BLOCK_SIZE) / 2;
-        return new float[] {
-            // TOP QUAD
-            x + s, y + s, z + s,
-            x - s, y + s, z + s,
-            x - s, y + s, z - s,
-            x + s, y + s, z - s,
-
-            // BOTTOM QUAD
-            x + s, y - s, z - s,
-            x - s, y - s, z - s,
-            x - s, y - s, z + s,
-            x + s, y - s, z + s
-            ,
-            // FRONT QUAD
-            x + s, y + s, z - s,
-            x - s, y + s, z - s,
-            x - s, y - s, z - s,
-            x + s, y - s, z - s,
-
-            // BACK QUAD
-            x + s, y - s, z + s,
-            x - s, y - s, z + s,
-            x - s, y + s, z + s,
-            x + s, y + s, z + s,
-
-            // LEFT QUAD
-            x - s, y + s, z - s,
-            x - s, y + s, z + s,
-            x - s, y - s, z + s,
-            x - s, y - s, z - s,
-
-            // RIGHT QUAD
-            x + s, y + s, z + s,
-            x + s, y + s, z - s,
-            x + s, y - s, z - s,
-            x + s, y - s, z + s
-        };
+        int floatsPerFace = 3 * 4;
+        
+        // TOP QUAD
+        if (faceVisible[0]) {
+            System.arraycopy(new float[] {
+                x + s, y + s, z + s,
+                x - s, y + s, z + s,
+                x - s, y + s, z - s,
+                x + s, y + s, z - s
+            }, 0, buff, startIndex, floatsPerFace);
+            startIndex += floatsPerFace;
+        }
+        
+        if (faceVisible[1]) {
+            System.arraycopy(new float[] {
+                // BOTTOM QUAD
+                x + s, y - s, z - s,
+                x - s, y - s, z - s,
+                x - s, y - s, z + s,
+                x + s, y - s, z + s
+            }, 0, buff, startIndex, floatsPerFace);
+            startIndex += floatsPerFace;
+        }
+        
+        if (faceVisible[2]) {
+            System.arraycopy(new float[] {
+                // FRONT QUAD
+                x + s, y + s, z - s,
+                x - s, y + s, z - s,
+                x - s, y - s, z - s,
+                x + s, y - s, z - s
+            }, 0, buff, startIndex, floatsPerFace);
+            startIndex += floatsPerFace;
+        }
+        
+        if (faceVisible[3]) {
+            System.arraycopy(new float[] {
+                // BACK QUAD
+                x + s, y - s, z + s,
+                x - s, y - s, z + s,
+                x - s, y + s, z + s,
+                x + s, y + s, z + s
+            }, 0, buff, startIndex, floatsPerFace);
+            startIndex += floatsPerFace;
+        }
+        
+        if (faceVisible[4]) {
+            System.arraycopy(new float[] {
+                // LEFT QUAD
+                x - s, y + s, z - s,
+                x - s, y + s, z + s,
+                x - s, y - s, z + s,
+                x - s, y - s, z - s
+            }, 0, buff, startIndex, floatsPerFace);
+            startIndex += floatsPerFace;
+        }
+        
+        if (faceVisible[5]) {
+            System.arraycopy(new float[] {
+                // RIGHT QUAD
+                x + s, y + s, z + s,
+                x + s, y + s, z - s,
+                x + s, y - s, z - s,
+                x + s, y - s, z + s
+            }, 0, buff, startIndex, floatsPerFace);
+            startIndex += floatsPerFace;
+        }
     }
     
     /**
@@ -360,7 +329,7 @@ public class Chunk implements Drawable {
     * purpose: Return an array of float vertices that define the texture for
     * a block of type v
     **/
-    private float[] getTexture(VoxelType v) {
+    private void textureCube(float[] buff, int startIndex, boolean[] faceVisible, VoxelType v) {
         float offset = (2048f/16)/2048f;
         
         int btmX, topX, fntX, bckX, lftX, rhtX;
@@ -411,37 +380,72 @@ public class Chunk implements Drawable {
                 break;
         }
         
-        return new float[] {
-            // bottom
-            offset*(btmX + 1), offset*(btmY + 1),
-            offset*(btmX + 0), offset*(btmY + 1),
-            offset*(btmX + 0), offset*(btmY + 0),
-            offset*(btmX + 1), offset*(btmY + 0),
-            // top
-            offset*(topX + 1), offset*(topY + 1),
-            offset*(topX + 0), offset*(topY + 1),
-            offset*(topX + 0), offset*(topY + 0),
-            offset*(topX + 1), offset*(topY + 0),
-            // front
-            offset*(fntX + 0), offset*(fntY + 0),
-            offset*(fntX + 1), offset*(fntY + 0),
-            offset*(fntX + 1), offset*(fntY + 1),
-            offset*(fntX + 0), offset*(fntY + 1),
-            // back
-            offset*(bckX + 1), offset*(bckY + 1),
-            offset*(bckX + 0), offset*(bckY + 1),
-            offset*(bckX + 0), offset*(bckY + 0),
-            offset*(bckX + 1), offset*(bckY + 0),
-            // left
-            offset*(lftX + 0), offset*(lftY + 0),
-            offset*(lftX + 1), offset*(lftY + 0),
-            offset*(lftX + 1), offset*(lftY + 1),
-            offset*(lftX + 0), offset*(lftY + 1),
-            // right
-            offset*(rhtX + 0), offset*(rhtY + 0),
-            offset*(rhtX + 1), offset*(rhtY + 0),
-            offset*(rhtX + 1), offset*(rhtY + 1),
-            offset*(rhtX + 0), offset*(rhtY + 1)
-        };   
+        int floatsPerFace = 2 * 4;
+        
+        // bottom
+        if (faceVisible[0]) {
+            System.arraycopy(new float[] {
+                offset*(btmX + 1), offset*(btmY + 1),
+                offset*(btmX + 0), offset*(btmY + 1),
+                offset*(btmX + 0), offset*(btmY + 0),
+                offset*(btmX + 1), offset*(btmY + 0)
+            }, 0, buff, startIndex, floatsPerFace);
+            startIndex += floatsPerFace;
+        }
+        
+        // top
+        if (faceVisible[1]) {
+            System.arraycopy(new float[] {
+                offset*(topX + 1), offset*(topY + 1),
+                offset*(topX + 0), offset*(topY + 1),
+                offset*(topX + 0), offset*(topY + 0),
+                offset*(topX + 1), offset*(topY + 0)
+            }, 0, buff, startIndex, floatsPerFace);
+            startIndex += floatsPerFace;
+        }
+        
+        // front
+        if (faceVisible[2]) {
+            System.arraycopy(new float[] {
+                offset*(fntX + 0), offset*(fntY + 0),
+                offset*(fntX + 1), offset*(fntY + 0),
+                offset*(fntX + 1), offset*(fntY + 1),
+                offset*(fntX + 0), offset*(fntY + 1)
+            }, 0, buff, startIndex, floatsPerFace);
+            startIndex += floatsPerFace;
+        }
+        
+        // back
+        if (faceVisible[3]) {
+            System.arraycopy(new float[] {
+                offset*(bckX + 1), offset*(bckY + 1),
+                offset*(bckX + 0), offset*(bckY + 1),
+                offset*(bckX + 0), offset*(bckY + 0),
+                offset*(bckX + 1), offset*(bckY + 0)
+            }, 0, buff, startIndex, floatsPerFace);
+            startIndex += floatsPerFace;
+        }
+        
+        // left
+        if (faceVisible[4]) {
+            System.arraycopy(new float[] {
+                offset*(lftX + 0), offset*(lftY + 0),
+                offset*(lftX + 1), offset*(lftY + 0),
+                offset*(lftX + 1), offset*(lftY + 1),
+                offset*(lftX + 0), offset*(lftY + 1)
+            }, 0, buff, startIndex, floatsPerFace);
+            startIndex += floatsPerFace;
+        }
+        
+        // right
+        if (faceVisible[5]) {
+            System.arraycopy(new float[] {
+                offset*(rhtX + 0), offset*(rhtY + 0),
+                offset*(rhtX + 1), offset*(rhtY + 0),
+                offset*(rhtX + 1), offset*(rhtY + 1),
+                offset*(rhtX + 0), offset*(rhtY + 1)
+            }, 0, buff, startIndex, floatsPerFace);
+            startIndex += floatsPerFace;
+        }
     }
 }

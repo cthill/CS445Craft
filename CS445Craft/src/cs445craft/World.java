@@ -10,8 +10,8 @@ import java.io.IOException;
 import java.util.Random;
 
 public class World implements Drawable {
-    public static final int CHUNK_S = 16; // 30 x 30 x 30 chunk
-    public static final int CHUNK_H = 32; // 30 x 30 x 30 chunk
+    public static final int CHUNK_S = 30; // 30 x 30 x 30 chunk
+    public static final int CHUNK_H = 30; // 30 x 30 x 30 chunk
     
     public static final int NUM_BLOCKS = CHUNK_S * CHUNK_S * CHUNK_H;
     
@@ -43,11 +43,11 @@ public class World implements Drawable {
         return CHUNK_S * Chunk.BLOCK_SIZE * size;
     }
     
-    private int worldPosToBlockIndex(float pos) {
+    public int worldPosToBlockIndex(float pos) {
         return -(int) (Math.round(pos / Chunk.BLOCK_SIZE));
     }
     
-    private int blockIndexToChunkNum(int index) {
+    public int blockIndexToChunkNum(int index) {
         return index / CHUNK_S;
     }
     
@@ -131,11 +131,7 @@ public class World implements Drawable {
                             }
                         } else {
                             type = VoxelType.GRASS;
-                            if (
-                                x > 3 && z > 3 &&
-                                x < CHUNK_S - 4 && z < CHUNK_S - 4 &&
-                                rand.nextDouble() < 0.05
-                            ) {
+                            if (rand.nextDouble() < 0.0025) {
                                 addTree(blocks, x,y + 1,z);
                             }
                         }
@@ -201,9 +197,9 @@ public class World implements Drawable {
             int yy = blockCoords[i + 1];
             int zz = blockCoords[i + 2];
             if (
-                xx >= 0 && xx < CHUNK_S &&
+                xx >= 0 && xx < CHUNK_S * size &&
                 yy >= 0 && yy < CHUNK_H &&
-                zz >= 0 && zz < CHUNK_S
+                zz >= 0 && zz < CHUNK_S * size
             ) {
                 blocks[xx][yy][zz] = type;
             }

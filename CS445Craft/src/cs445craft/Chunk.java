@@ -15,6 +15,7 @@
 
 package cs445craft;
 
+import cs445craft.Voxel.VoxelType;
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.IOException;
@@ -26,45 +27,21 @@ import org.newdawn.slick.opengl.Texture;
 import org.newdawn.slick.opengl.TextureLoader;
 
 public class Chunk extends Drawable {
-    public static final int BLOCK_SIZE = 2;
+    public float chunkX, chunkY, chunkZ;
     private int chunkSize;
     private int chunkHeight;
     private int numBlocks;
+    private VoxelType[][][] blocks;
+    
+    private boolean excludeHidden;
     private int numVisibleFaces;
     private int numVisibleFacesTranslucent;
     
-    public enum VoxelType {
-        GRASS,
-        SAND,
-        WATER,
-        DIRT,
-        STONE,
-        TRUNK,
-        LEAVES,
-        BEDROCK,
-        GLASS,
-        RED_FLOWER,
-        YELLOW_FLOWER,
-        RED_MUSHROOM,
-        MUSHROOM,
-        TALL_GRASS,
-        REED,
-        COAL,
-        IRON,
-        GOLD,
-        DIAMOND
-    }
-    
-    public float chunkX, chunkY, chunkZ;
-    private VoxelType[][][] blocks;
-    
+    private Texture texture;
     private int VBOVertexHandle;
     private int VBOTextureHandle;
     private int VBOVertexHandleTranslucent;
     private int VBOTextureHandleTranslucent;
-    
-    private Texture texture;
-    private boolean excludeHidden;
     
     public Chunk(float chunkX, float chunkY, float chunkZ, int chunkSize, int chunkHeight) throws IOException {
         this.chunkX = chunkX;
@@ -73,13 +50,10 @@ public class Chunk extends Drawable {
         this.chunkSize = chunkSize;
         this.chunkHeight = chunkHeight;
         this.numBlocks = chunkSize * chunkHeight * chunkSize;
-        
+        excludeHidden = true;
         
         blocks = new VoxelType[chunkSize][chunkHeight][chunkSize];
-        
         texture = TextureLoader.getTexture("png", new FileInputStream(new File("res/terrain.png")));
-
-        excludeHidden = true;
     }
     
     public void copyBlocks(VoxelType[][][] wBlocks, int sx, int lx, int sy, int ly, int sz, int lz) {
@@ -107,7 +81,7 @@ public class Chunk extends Drawable {
         
     public void removeBlock(int x, int y, int z) {
         VoxelType v = safeLookup(x, y, z);
-        if (v != null && isBreakable(v)) {
+        if (v != null && Voxel.isBreakable(v)) {
             blocks[x][y][z] = null;
         }
     }
@@ -119,13 +93,13 @@ public class Chunk extends Drawable {
     
     public boolean solidBlockAt(int x, int y, int z) {
         VoxelType block = safeLookup(x, y, z);
-        return block != null && isSolid(block); 
+        return block != null && Voxel.isSolid(block); 
     }
     
     public float depthAt(int x, int y, int z) {
         for (int i = y; i >= 0; i--) {
             VoxelType block = safeLookup(x, i, z);
-            if (block != null && isSolid(block)) {
+            if (block != null && Voxel.isSolid(block)) {
                 return i;
             }
         }
@@ -186,55 +160,6 @@ public class Chunk extends Drawable {
         rebuildMesh();
     }
     
-    private boolean isTranslucent(VoxelType v) {
-        return (
-            v == VoxelType.WATER ||
-            v == VoxelType.GLASS
-        );
-    }
-    
-    private boolean isPartiallyTransparent(VoxelType v) {
-        return (
-            v == VoxelType.LEAVES ||
-            v == VoxelType.RED_FLOWER ||
-            v == VoxelType.YELLOW_FLOWER ||
-            v == VoxelType.RED_MUSHROOM ||
-            v == VoxelType.MUSHROOM ||
-            v == VoxelType.TALL_GRASS ||
-            v == VoxelType.REED
-        );
-    }
-    
-    private boolean isSolid(VoxelType v) {
-        return !(
-            v == VoxelType.WATER ||
-            v == VoxelType.RED_FLOWER ||
-            v == VoxelType.YELLOW_FLOWER ||
-            v == VoxelType.RED_MUSHROOM ||
-            v == VoxelType.MUSHROOM ||
-            v == VoxelType.TALL_GRASS
-        );
-    }
-    
-    private boolean isBreakable(VoxelType v) {
-        return !(
-            v == VoxelType.WATER ||
-            v == VoxelType.BEDROCK
-        );
-    }
-    
-    private boolean isCrossType(VoxelType v) {
-        return (
-            v == VoxelType.RED_FLOWER ||
-            v == VoxelType.YELLOW_FLOWER ||
-            v == VoxelType.RED_MUSHROOM ||
-            v == VoxelType.MUSHROOM ||
-            v == VoxelType.TALL_GRASS ||
-            v == VoxelType.REED
-        );
-    }
-    
-    
     /**
     * method: rebuildMesh()
     * purpose: Loop over the blocks array to build a 3d mesh of the chunk to
@@ -269,10 +194,10 @@ public class Chunk extends Drawable {
                         continue;
                     }
                     
-                    if (isCrossType(voxelType)) {
-                        float blockX = (float) (chunkX + x * BLOCK_SIZE);
-                        float blockY = (float) (y * BLOCK_SIZE - chunkHeight * BLOCK_SIZE);
-                        float blockZ = (float) (chunkZ + z * BLOCK_SIZE);
+                    if (Voxel.isCrossType(voxelType)) {
+                        float blockX = (float) (chunkX + x * Voxel.BLOCK_SIZE);
+                        float blockY = (float) (y * Voxel.BLOCK_SIZE - chunkHeight * Voxel.BLOCK_SIZE);
+                        float blockZ = (float) (chunkZ + z * Voxel.BLOCK_SIZE);
                         
                         createCross(positionData, writeIndexPosition, blockX, blockY, blockZ);
                         writeIndexPosition += floatsPerFacePosition * 4;
@@ -285,7 +210,7 @@ public class Chunk extends Drawable {
                     }
                     
                     // check if block is transparent
-                    boolean translucentTexture = isTranslucent(voxelType);
+                    boolean translucentTexture = Voxel.isTranslucent(voxelType);
 
                     boolean[] faceVisible = new boolean[] { true, true, true, true, true, true };
                     if (excludeHidden) {
@@ -304,17 +229,17 @@ public class Chunk extends Drawable {
                         
                         if (!translucentTexture) {
                             if (y < chunkHeight - 1)
-                                faceVisible[0] |= isTranslucent(blocks[x][y+1][z]) || isPartiallyTransparent(blocks[x][y+1][z]);
+                                faceVisible[0] |= Voxel.isTranslucent(blocks[x][y+1][z]) || Voxel.isPartiallyTransparent(blocks[x][y+1][z]);
                             if (y > 0)
-                                faceVisible[1] |= isTranslucent(blocks[x][y-1][z]) || isPartiallyTransparent(blocks[x][y-1][z]);
+                                faceVisible[1] |= Voxel.isTranslucent(blocks[x][y-1][z]) || Voxel.isPartiallyTransparent(blocks[x][y-1][z]);
                             if (z > 0)
-                                faceVisible[2] |= isTranslucent(blocks[x][y][z-1]) || isPartiallyTransparent(blocks[x][y][z-1]);
+                                faceVisible[2] |= Voxel.isTranslucent(blocks[x][y][z-1]) || Voxel.isPartiallyTransparent(blocks[x][y][z-1]);
                             if (z < chunkSize - 1)
-                                faceVisible[3] |= isTranslucent(blocks[x][y][z+1]) || isPartiallyTransparent(blocks[x][y][z+1]);
+                                faceVisible[3] |= Voxel.isTranslucent(blocks[x][y][z+1]) || Voxel.isPartiallyTransparent(blocks[x][y][z+1]);
                             if (x > 0)
-                                faceVisible[4] |= isTranslucent(blocks[x-1][y][z]) || isPartiallyTransparent(blocks[x-1][y][z]);
+                                faceVisible[4] |= Voxel.isTranslucent(blocks[x-1][y][z]) || Voxel.isPartiallyTransparent(blocks[x-1][y][z]);
                             if (x < chunkSize - 1)
-                                faceVisible[5] |= isTranslucent(blocks[x+1][y][z]) || isPartiallyTransparent(blocks[x+1][y][z]);
+                                faceVisible[5] |= Voxel.isTranslucent(blocks[x+1][y][z]) || Voxel.isPartiallyTransparent(blocks[x+1][y][z]);
                         }
                     }
                     
@@ -336,9 +261,9 @@ public class Chunk extends Drawable {
                         continue;
                     }
                     
-                    float blockX = (float) (chunkX + x * BLOCK_SIZE);
-                    float blockY = (float) (y * BLOCK_SIZE - chunkHeight * BLOCK_SIZE);
-                    float blockZ = (float) (chunkZ + z * BLOCK_SIZE);
+                    float blockX = (float) (chunkX + x * Voxel.BLOCK_SIZE);
+                    float blockY = (float) (y * Voxel.BLOCK_SIZE - chunkHeight * Voxel.BLOCK_SIZE);
+                    float blockZ = (float) (chunkZ + z * Voxel.BLOCK_SIZE);
                     
                     // write cube position vertex data and texture vertex data
                     if (!translucentTexture) {
@@ -401,7 +326,7 @@ public class Chunk extends Drawable {
     **/
     
     private static void createCube(float[] buff, int startIndex, boolean[] faceVisible, float x, float y, float z) {
-        float s = ((float) BLOCK_SIZE) / 2;
+        float s = ((float) Voxel.BLOCK_SIZE) / 2;
         int floatsPerFace = 3 * 4;
         
         // TOP QUAD
@@ -471,8 +396,85 @@ public class Chunk extends Drawable {
         }
     }
     
+    /**
+    * method: getTexture()
+    * purpose: Return an array of float vertices that define the texture for
+    * a block of type v
+    **/
+    private void textureCube(float[] buff, int startIndex, boolean[] faceVisible, VoxelType v) {
+        float offset = (2048f/16)/2048f;
+        int floatsPerFace = 2 * 4;
+        int[] t = Voxel.getTexture(v);
+        
+        // bottom
+        if (faceVisible[0]) {
+            System.arraycopy(new float[] {
+                offset*(t[2] + 1), offset*(t[3] + 1),
+                offset*(t[2] + 0), offset*(t[3] + 1),
+                offset*(t[2] + 0), offset*(t[3] + 0),
+                offset*(t[2] + 1), offset*(t[3] + 0)
+            }, 0, buff, startIndex, floatsPerFace);
+            startIndex += floatsPerFace;
+        }
+        
+        // top
+        if (faceVisible[1]) {
+            System.arraycopy(new float[] {
+                offset*(t[0] + 1), offset*(t[1] + 1),
+                offset*(t[0] + 0), offset*(t[1] + 1),
+                offset*(t[0] + 0), offset*(t[1] + 0),
+                offset*(t[0] + 1), offset*(t[1] + 0)
+            }, 0, buff, startIndex, floatsPerFace);
+            startIndex += floatsPerFace;
+        }
+        
+        // front
+        if (faceVisible[2]) {
+            System.arraycopy(new float[] {
+                offset*(t[4] + 0), offset*(t[5] + 0),
+                offset*(t[4] + 1), offset*(t[5] + 0),
+                offset*(t[4] + 1), offset*(t[5] + 1),
+                offset*(t[4] + 0), offset*(t[5] + 1)
+            }, 0, buff, startIndex, floatsPerFace);
+            startIndex += floatsPerFace;
+        }
+        
+        // back
+        if (faceVisible[3]) {
+            System.arraycopy(new float[] {
+                offset*(t[6] + 1), offset*(t[7] + 1),
+                offset*(t[6] + 0), offset*(t[7] + 1),
+                offset*(t[6] + 0), offset*(t[7] + 0),
+                offset*(t[6] + 1), offset*(t[7] + 0)
+            }, 0, buff, startIndex, floatsPerFace);
+            startIndex += floatsPerFace;
+        }
+        
+        // left
+        if (faceVisible[4]) {
+            System.arraycopy(new float[] {
+                offset*(t[8] + 0), offset*(t[9] + 0),
+                offset*(t[8] + 1), offset*(t[9] + 0),
+                offset*(t[8] + 1), offset*(t[9] + 1),
+                offset*(t[8] + 0), offset*(t[9] + 1)
+            }, 0, buff, startIndex, floatsPerFace);
+            startIndex += floatsPerFace;
+        }
+        
+        // right
+        if (faceVisible[5]) {
+            System.arraycopy(new float[] {
+                offset*(t[10] + 0), offset*(t[11] + 0),
+                offset*(t[10] + 1), offset*(t[11] + 0),
+                offset*(t[10] + 1), offset*(t[11] + 1),
+                offset*(t[10] + 0), offset*(t[11] + 1)
+            }, 0, buff, startIndex, floatsPerFace);
+            startIndex += floatsPerFace;
+        }
+    }
+    
     private static void createCross(float[] buff, int startIndex, float x, float y, float z) {
-        float s = ((float) BLOCK_SIZE) / 2;
+        float s = ((float) Voxel.BLOCK_SIZE) / 2;
         int floatsPerFace = 3 * 4;
         
         System.arraycopy(new float[] {
@@ -502,215 +504,36 @@ public class Chunk extends Drawable {
         }, 0, buff, startIndex, floatsPerFace * 4);
     }
     
-    /**
-    * method: getTexture()
-    * purpose: Return an array of float vertices that define the texture for
-    * a block of type v
-    **/
-    private void textureCube(float[] buff, int startIndex, boolean[] faceVisible, VoxelType v) {
+    private void textureCross(float[] buff, int startIndex, VoxelType v) {
         float offset = (2048f/16)/2048f;
-        
-        int btmX, topX, fntX, bckX, lftX, rhtX;
-        int btmY, topY, fntY, bckY, lftY, rhtY;
-        
-        switch (v) {
-            case GRASS:
-                btmX = 2;
-                btmY = 9;
-                topX = 2;
-                topY = 0;
-                lftX = rhtX = bckX = fntX = 3;
-                lftY = rhtY = bckY = fntY = 0;
-                break;
-            case SAND:
-                btmX = topX = lftX = rhtX = fntX = bckX = 2;
-                btmY = topY = lftY = rhtY = fntY = bckY = 1;
-                break;
-            case WATER:
-                btmX = topX = lftX = rhtX = fntX = bckX = 13;
-                btmY = topY = lftY = rhtY = fntY = bckY = 12;
-                break;
-            case DIRT:
-                btmX = topX = lftX = rhtX = fntX = bckX = 2;
-                btmY = topY = lftY = rhtY = fntY = bckY = 0;
-                break;
-            case STONE:
-                btmX = topX = lftX = rhtX = fntX = bckX = 1;
-                btmY = topY = lftY = rhtY = fntY = bckY = 0;
-                break;
-            case TRUNK:
-                btmX = topX = 5;
-                btmY = topY = 1;
-                lftX = rhtX = bckX = fntX = 4;
-                lftY = rhtY = bckY = fntY = 1;
-                break;
-            case LEAVES:
-                btmX = topX = lftX = rhtX = fntX = bckX = 10;
-                btmY = topY = lftY = rhtY = fntY = bckY = 1;
-                break;
-            case BEDROCK:
-                btmX = topX = lftX = rhtX = fntX = bckX = 1;
-                btmY = topY = lftY = rhtY = fntY = bckY = 1;
-                break;
-            case GLASS:
-                btmX = topX = lftX = rhtX = fntX = bckX = 1;
-                btmY = topY = lftY = rhtY = fntY = bckY = 3;
-                break;
-            case COAL:
-                btmX = topX = lftX = rhtX = fntX = bckX = 2;
-                btmY = topY = lftY = rhtY = fntY = bckY = 2;
-                break;
-            case IRON:
-                btmX = topX = lftX = rhtX = fntX = bckX = 1;
-                btmY = topY = lftY = rhtY = fntY = bckY = 2;
-                break;
-            case GOLD:
-                btmX = topX = lftX = rhtX = fntX = bckX = 0;
-                btmY = topY = lftY = rhtY = fntY = bckY = 2;
-                break;
-            case DIAMOND:
-                btmX = topX = lftX = rhtX = fntX = bckX = 2;
-                btmY = topY = lftY = rhtY = fntY = bckY = 3;
-                break;
-            default:
-                btmX = topX = lftX = rhtX = fntX = bckX = 11;
-                btmY = topY = lftY = rhtY = fntY = bckY = 1;
-                break;
-        }
-        
         int floatsPerFace = 2 * 4;
-        
-        // bottom
-        if (faceVisible[0]) {
-            System.arraycopy(new float[] {
-                offset*(btmX + 1), offset*(btmY + 1),
-                offset*(btmX + 0), offset*(btmY + 1),
-                offset*(btmX + 0), offset*(btmY + 0),
-                offset*(btmX + 1), offset*(btmY + 0)
-            }, 0, buff, startIndex, floatsPerFace);
-            startIndex += floatsPerFace;
-        }
-        
-        // top
-        if (faceVisible[1]) {
-            System.arraycopy(new float[] {
-                offset*(topX + 1), offset*(topY + 1),
-                offset*(topX + 0), offset*(topY + 1),
-                offset*(topX + 0), offset*(topY + 0),
-                offset*(topX + 1), offset*(topY + 0)
-            }, 0, buff, startIndex, floatsPerFace);
-            startIndex += floatsPerFace;
-        }
-        
-        // front
-        if (faceVisible[2]) {
-            System.arraycopy(new float[] {
-                offset*(fntX + 0), offset*(fntY + 0),
-                offset*(fntX + 1), offset*(fntY + 0),
-                offset*(fntX + 1), offset*(fntY + 1),
-                offset*(fntX + 0), offset*(fntY + 1)
-            }, 0, buff, startIndex, floatsPerFace);
-            startIndex += floatsPerFace;
-        }
-        
-        // back
-        if (faceVisible[3]) {
-            System.arraycopy(new float[] {
-                offset*(bckX + 1), offset*(bckY + 1),
-                offset*(bckX + 0), offset*(bckY + 1),
-                offset*(bckX + 0), offset*(bckY + 0),
-                offset*(bckX + 1), offset*(bckY + 0)
-            }, 0, buff, startIndex, floatsPerFace);
-            startIndex += floatsPerFace;
-        }
-        
-        // left
-        if (faceVisible[4]) {
-            System.arraycopy(new float[] {
-                offset*(lftX + 0), offset*(lftY + 0),
-                offset*(lftX + 1), offset*(lftY + 0),
-                offset*(lftX + 1), offset*(lftY + 1),
-                offset*(lftX + 0), offset*(lftY + 1)
-            }, 0, buff, startIndex, floatsPerFace);
-            startIndex += floatsPerFace;
-        }
-        
-        // right
-        if (faceVisible[5]) {
-            System.arraycopy(new float[] {
-                offset*(rhtX + 0), offset*(rhtY + 0),
-                offset*(rhtX + 1), offset*(rhtY + 0),
-                offset*(rhtX + 1), offset*(rhtY + 1),
-                offset*(rhtX + 0), offset*(rhtY + 1)
-            }, 0, buff, startIndex, floatsPerFace);
-            startIndex += floatsPerFace;
-        }
-    }
-    
-     private void textureCross(float[] buff, int startIndex, VoxelType v) {
-        float offset = (2048f/16)/2048f;
-        
-        int fntX, bckX, lftX, rhtX;
-        int fntY, bckY, lftY, rhtY;
-        
-        switch (v) {
-            case RED_FLOWER:
-                lftX = rhtX = fntX = bckX = 12;
-                lftY = rhtY = fntY = bckY = 0;
-                break;
-            case YELLOW_FLOWER:
-                lftX = rhtX = fntX = bckX = 13;
-                lftY = rhtY = fntY = bckY = 0;
-                break;
-            case RED_MUSHROOM:
-                lftX = rhtX = fntX = bckX = 12;
-                lftY = rhtY = fntY = bckY = 1;
-                break;
-            case MUSHROOM:
-                lftX = rhtX = fntX = bckX = 13;
-                lftY = rhtY = fntY = bckY = 1;
-                break;
-            case TALL_GRASS:
-                lftX = rhtX = fntX = bckX = 9;
-                lftY = rhtY = fntY = bckY = 5;
-                break;
-            case REED:
-                lftX = rhtX = fntX = bckX = 9;
-                lftY = rhtY = fntY = bckY = 4;
-                break;
-            default:
-                lftX = rhtX = fntX = bckX = 11;
-                lftY = rhtY = fntY = bckY = 1;
-                break;
-        }
-        
-        int floatsPerFace = 2 * 4;
+        int[] t = Voxel.getTexture(v);
         
         
         System.arraycopy(new float[] {
             // front
-            offset*(fntX + 0), offset*(fntY + 0),
-            offset*(fntX + 1), offset*(fntY + 0),
-            offset*(fntX + 1), offset*(fntY + 1),
-            offset*(fntX + 0), offset*(fntY + 1),
+            offset*(t[4] + 0), offset*(t[5] + 0),
+            offset*(t[4] + 1), offset*(t[5] + 0),
+            offset*(t[4] + 1), offset*(t[5] + 1),
+            offset*(t[4] + 0), offset*(t[5] + 1),
         
             // back
-            offset*(bckX + 1), offset*(bckY + 1),
-            offset*(bckX + 0), offset*(bckY + 1),
-            offset*(bckX + 0), offset*(bckY + 0),
-            offset*(bckX + 1), offset*(bckY + 0),
+            offset*(t[6] + 1), offset*(t[7] + 1),
+            offset*(t[6] + 0), offset*(t[7] + 1),
+            offset*(t[6] + 0), offset*(t[7] + 0),
+            offset*(t[6] + 1), offset*(t[7] + 0),
 
             // left
-            offset*(lftX + 0), offset*(lftY + 0),
-            offset*(lftX + 1), offset*(lftY + 0),
-            offset*(lftX + 1), offset*(lftY + 1),
-            offset*(lftX + 0), offset*(lftY + 1),
+            offset*(t[8] + 0), offset*(t[9] + 0),
+            offset*(t[8] + 1), offset*(t[9] + 0),
+            offset*(t[8] + 1), offset*(t[9] + 1),
+            offset*(t[8] + 0), offset*(t[9] + 1),
 
             // right
-            offset*(rhtX + 0), offset*(rhtY + 0),
-            offset*(rhtX + 1), offset*(rhtY + 0),
-            offset*(rhtX + 1), offset*(rhtY + 1),
-            offset*(rhtX + 0), offset*(rhtY + 1)
+            offset*(t[10] + 0), offset*(t[11] + 0),
+            offset*(t[10] + 1), offset*(t[11] + 0),
+            offset*(t[10] + 1), offset*(t[11] + 1),
+            offset*(t[10] + 0), offset*(t[11] + 1)
         }, 0, buff, startIndex, floatsPerFace * 4);
     }       
 }

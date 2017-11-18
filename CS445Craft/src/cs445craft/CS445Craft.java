@@ -52,7 +52,7 @@ public class CS445Craft {
         float yspeed = 0.0f;
         
         // player is 1.5 blocks tall, so yOffset = Chunk.CUBE_S * 1.5;
-        float playerHeight = Chunk.BLOCK_SIZE * 1.5f;
+        float playerHeight = Voxel.BLOCK_SIZE * 1.5f;
         float sideCollideHeightFactor = 0.75f;
         boolean lastSpaceState = false; // last state of the spacebar (true == pressed)
         boolean lastVState = false;
@@ -79,7 +79,7 @@ public class CS445Craft {
             if (Mouse.isButtonDown(0)) {
                 if (!lastMouseState) {
                     lastMouseState = true;
-                    for (int amplitude = 1; amplitude <= Chunk.BLOCK_SIZE * 2; amplitude++) {
+                    for (float amplitude = 0.5f; amplitude <= Voxel.BLOCK_SIZE * 2; amplitude++) {
                         float clickX = camera.x - (float) (amplitude * Math.sin(Math.toRadians(camera.yaw)) * Math.cos(Math.toRadians(camera.pitch)));
                         float clickZ = camera.z + (float) (amplitude * Math.cos(Math.toRadians(camera.yaw)) * Math.cos(Math.toRadians(camera.pitch)));
                         
@@ -167,7 +167,7 @@ public class CS445Craft {
                 dy = 0;
                 // prevent player from getting stuck in floor if they have high y speed
                 float depth = w.depthAt(camera.x, camera.y, camera.z);
-                camera.y = World.CHUNK_H * Chunk.BLOCK_SIZE - depth * Chunk.BLOCK_SIZE - playerHeight - .75f;
+                camera.y = World.CHUNK_H * Voxel.BLOCK_SIZE - depth * Voxel.BLOCK_SIZE - playerHeight - .75f;
                 //camera.y = Math.round(camera.y - 0.5f);
             } else {
                 if (blockAbove && yspeed < 0) {
@@ -211,7 +211,7 @@ public class CS445Craft {
             
             float offsetX, offsetZ, offsetXZ;
             offsetX = offsetZ = 0.0f;
-            offsetXZ = Chunk.BLOCK_SIZE / 3.75f;
+            offsetXZ = Voxel.BLOCK_SIZE / 3.75f;
             
             if (dx > 0) {
                 offsetX = offsetXZ;
@@ -228,13 +228,13 @@ public class CS445Craft {
             // player is ~2 blocks tall, so we must check side collision twice on each axis
             float offsetY = playerHeight * sideCollideHeightFactor;
             boolean willCollideX = w.solidBlockAt(camera.x + dx + offsetX, camera.y + offsetY, camera.z);
-                   willCollideX |= w.solidBlockAt(camera.x + dx + offsetX, camera.y + offsetY - Chunk.BLOCK_SIZE, camera.z);
+                   willCollideX |= w.solidBlockAt(camera.x + dx + offsetX, camera.y + offsetY - Voxel.BLOCK_SIZE, camera.z);
             boolean willCollideZ = w.solidBlockAt(camera.x, camera.y + offsetY, camera.z + dz + offsetZ);
-                   willCollideZ |= w.solidBlockAt(camera.x, camera.y + offsetY - Chunk.BLOCK_SIZE, camera.z + dz + offsetZ);
+                   willCollideZ |= w.solidBlockAt(camera.x, camera.y + offsetY - Voxel.BLOCK_SIZE, camera.z + dz + offsetZ);
                    
             // special case for when running directly into a corner
             boolean willCollideXZ = w.solidBlockAt(camera.x + dx + offsetX, camera.y + offsetY, camera.z + dz + offsetZ);
-                   willCollideXZ |= w.solidBlockAt(camera.x + dx + offsetX, camera.y + offsetY - Chunk.BLOCK_SIZE, camera.z + dz + offsetZ);
+                   willCollideXZ |= w.solidBlockAt(camera.x + dx + offsetX, camera.y + offsetY - Voxel.BLOCK_SIZE, camera.z + dz + offsetZ);
                    
             if (willCollideXZ && !willCollideX && !willCollideZ && !noClip) {
                 dx = 0;

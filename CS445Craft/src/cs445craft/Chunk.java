@@ -96,6 +96,13 @@ public class Chunk extends Drawable {
             x++;
         }
     }
+        
+    public void removeBlock(int x, int y, int z) {
+        VoxelType v = safeLookup(x, y, z);
+        if (v != null && isBreakable(v)) {
+            blocks[x][y][z] = null;
+        }
+    }
 
     public boolean blockAt(int x, int y, int z) {
         VoxelType block = safeLookup(x, y, z);
@@ -182,6 +189,12 @@ public class Chunk extends Drawable {
     private boolean isSolid(VoxelType v) {
         return !(
             v == VoxelType.WATER
+        );
+    }
+    
+    private boolean isBreakable(VoxelType v) {
+        return !(
+            v == VoxelType.BEDROCK
         );
     }
     

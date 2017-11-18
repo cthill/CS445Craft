@@ -214,20 +214,24 @@ public class World {
         return chunks[0][0];
     }
     
-    public void draw() {
-        for (int i = 0; i < size; i++) {
-            for (int j = 0; j < size; j++) {
-                chunks[i][j].draw();
-            }
+    public void removeBlock(float x, float y, float z) {
+        int xIndex = worldPosToBlockIndex(x);
+        int yIndex = worldPosToBlockIndex(y);
+        int zIndex = worldPosToBlockIndex(z);
+        
+        int i = blockIndexToChunkNum(xIndex);
+        int j = blockIndexToChunkNum(zIndex);
+        
+        xIndex -= i * CHUNK_S;
+        zIndex -= j * CHUNK_S;
+        yIndex -= -CHUNK_H;
+        
+        if (i < 0 || i >= size || j < 0 || j >= size) {
+            return;
         }
-    }
-    
-    public void drawTranslucent() {
-        for (int i = 0; i < size; i++) {
-            for (int j = 0; j < size; j++) {
-                chunks[i][j].drawTranslucent();
-            }
-        }
+        
+        chunks[i][j].removeBlock(xIndex, yIndex, zIndex);
+        chunks[i][j].rebuildMesh();
     }
     
     public void swapMeshes() {

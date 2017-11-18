@@ -57,6 +57,7 @@ public class CS445Craft {
         boolean lastSpaceState = false; // last state of the spacebar (true == pressed)
         boolean lastVState = false;
         boolean lastRState = false;
+        boolean lastMouseState = false;
         
         int chunki = 0;
         int chunkj = 0;
@@ -73,6 +74,25 @@ public class CS445Craft {
             // listen for close requested
             if (screen.getCloseRequested()) {
                 break;
+            }
+            
+            if (Mouse.isButtonDown(0)) {
+                if (!lastMouseState) {
+                    lastMouseState = true;
+                    for (int amplitude = 1; amplitude <= Chunk.BLOCK_SIZE * 2; amplitude++) {
+                        float clickX = camera.x - (float) (amplitude * Math.sin(Math.toRadians(camera.yaw)) * Math.cos(Math.toRadians(camera.pitch)));
+                        float clickZ = camera.z + (float) (amplitude * Math.cos(Math.toRadians(camera.yaw)) * Math.cos(Math.toRadians(camera.pitch)));
+                        
+                        float clickY = camera.y + (float) (amplitude * Math.sin(Math.toRadians(camera.pitch)));
+                        
+                        if (w.blockAt(clickX, clickY, clickZ)) {
+                            w.removeBlock(clickX, clickY, clickZ);
+                            break;
+                        }
+                    } 
+                }
+            } else {
+                lastMouseState = false;
             }
             
             boolean updated = false;

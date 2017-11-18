@@ -27,6 +27,7 @@ import org.newdawn.slick.TrueTypeFont;
 
 public class Screen {
     private int width, height;
+    private float r, g, b;
     private String title;
     private Camera camera;
     private List<Drawable> objects;
@@ -39,6 +40,9 @@ public class Screen {
         this.title = title;
         this.camera = camera;
         objects = new ArrayList<>();
+        r = 1.0f;
+        g = 1.0f;
+        b = 1.0f;
         
         // create window
         Display.setFullscreen(false);
@@ -67,6 +71,12 @@ public class Screen {
         objects.add(object);
     }
     
+    public void setTintColor(float r, float g, float b) {
+        this.r = r;
+        this.g = g;
+        this.b = b;
+    }
+    
     /**
     * method: drawFrame
     * purpose: Draw one frame by looping through the list of Drawable objects
@@ -85,7 +95,7 @@ public class Screen {
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
         
         // 3d draw prepare
-        glColor3f(1.0f,1.0f,1.0f);
+        glColor3f(r, g, b);
         glLoadIdentity();
         glPushMatrix();
         camera.lookThrough();
@@ -112,6 +122,7 @@ public class Screen {
         
         // 3d draw finish
         glPopMatrix();
+        glColor3f(1.0f,1.0f,1.0f);
         
         // switch to 2d mode for hud draw
         glMatrixMode(GL_PROJECTION);

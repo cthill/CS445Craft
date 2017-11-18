@@ -27,6 +27,7 @@ import org.newdawn.slick.opengl.Texture;
 import org.newdawn.slick.opengl.TextureLoader;
 
 public class Chunk extends Drawable {
+    private World world;
     public float chunkX, chunkY, chunkZ;
     private int chunkSize;
     private int chunkHeight;
@@ -43,7 +44,8 @@ public class Chunk extends Drawable {
     private int VBOVertexHandleTranslucent;
     private int VBOTextureHandleTranslucent;
     
-    public Chunk(float chunkX, float chunkY, float chunkZ, int chunkSize, int chunkHeight) throws IOException {
+    public Chunk(World world, float chunkX, float chunkY, float chunkZ, int chunkSize, int chunkHeight) throws IOException {
+        this.world = world;
         this.chunkX = chunkX;
         this.chunkY = chunkY;
         this.chunkZ = chunkZ;
@@ -81,19 +83,45 @@ public class Chunk extends Drawable {
         
     public void removeBlock(int x, int y, int z) {
         VoxelType v = safeLookup(x, y, z);
-        if (v != null && Voxel.isBreakable(v)) {
+        if (v != null) {
+            // break block
             blocks[x][y][z] = null;
+            rebuildMesh();
+            
+            // check if breaking block at chunk boundary
+            int xDir = 0;
+            int zDir = 0;
+            
+            if (x == 0)
+                xDir = -1;
+            else if (x == chunkSize - 1)
+                xDir = 1;
+
+            if (z == 0)
+                zDir = -1;
+            else if (z == chunkSize - 1)
+                zDir = 1;
+
+            if (xDir != 0 || zDir != 0) {
+                // lookup adjacent chunk and rebuild the mesh
+                Chunk adjacent = world.findAdjacentChunk(this, xDir, zDir);
+                if (adjacent != null)
+                    adjacent.rebuildMesh();
+            }
         }
     }
 
-    public boolean blockAt(int x, int y, int z) {
-        VoxelType block = safeLookup(x, y, z);
-        return block != null;
+    public VoxelType blockAt(int x, int y, int z) {
+        return safeLookup(x, y, z);
     }
     
-    public boolean solidBlockAt(int x, int y, int z) {
+    public VoxelType solidBlockAt(int x, int y, int z) {
         VoxelType block = safeLookup(x, y, z);
-        return block != null && Voxel.isSolid(block); 
+        if (!Voxel.isSolid(block)) {
+            return null;
+        }
+        else 
+        return block;
     }
     
     public float depthAt(int x, int y, int z) {
@@ -214,33 +242,23 @@ public class Chunk extends Drawable {
 
                     boolean[] faceVisible = new boolean[] { true, true, true, true, true, true };
                     if (excludeHidden) {
+                        VoxelType above = lookupTraverseChunks(x, y - 1, z);
+                        VoxelType below = lookupTraverseChunks(x, y + 1, z);
+                        VoxelType front = lookupTraverseChunks(x, y, z + 1);
+                        VoxelType back = lookupTraverseChunks(x, y, z - 1);
+                        VoxelType left = lookupTraverseChunks(x - 1, y, z);
+                        VoxelType right = lookupTraverseChunks(x + 1, y, z);
+                        
+                        
                         // compute faces that can not be seen
                         faceVisible = new boolean[] {
-                            // top & bottom
-                            !(y < chunkHeight - 1 && blocks[x][y+1][z] != null),
-                            !(y > 0 && blocks[x][y-1][z] != null),
-                            // front & back
-                            !(z > 0 && blocks[x][y][z-1] != null),
-                            !(z < chunkSize - 1 && blocks[x][y][z+1] != null),
-                            // left & right
-                            !(x > 0 && blocks[x-1][y][z] != null),
-                            !(x < chunkSize - 1 && blocks[x+1][y][z] != null)
+                            below == null || (!translucentTexture && Voxel.isSeeTrough(below)),
+                            above == null || (!translucentTexture && Voxel.isSeeTrough(above)),
+                            back  == null || (!translucentTexture && Voxel.isSeeTrough(back)),
+                            front == null || (!translucentTexture && Voxel.isSeeTrough(front)),
+                            left  == null || (!translucentTexture && Voxel.isSeeTrough(left)),
+                            right == null || (!translucentTexture && Voxel.isSeeTrough(right)) 
                         };
-                        
-                        if (!translucentTexture) {
-                            if (y < chunkHeight - 1)
-                                faceVisible[0] |= Voxel.isTranslucent(blocks[x][y+1][z]) || Voxel.isPartiallyTransparent(blocks[x][y+1][z]);
-                            if (y > 0)
-                                faceVisible[1] |= Voxel.isTranslucent(blocks[x][y-1][z]) || Voxel.isPartiallyTransparent(blocks[x][y-1][z]);
-                            if (z > 0)
-                                faceVisible[2] |= Voxel.isTranslucent(blocks[x][y][z-1]) || Voxel.isPartiallyTransparent(blocks[x][y][z-1]);
-                            if (z < chunkSize - 1)
-                                faceVisible[3] |= Voxel.isTranslucent(blocks[x][y][z+1]) || Voxel.isPartiallyTransparent(blocks[x][y][z+1]);
-                            if (x > 0)
-                                faceVisible[4] |= Voxel.isTranslucent(blocks[x-1][y][z]) || Voxel.isPartiallyTransparent(blocks[x-1][y][z]);
-                            if (x < chunkSize - 1)
-                                faceVisible[5] |= Voxel.isTranslucent(blocks[x+1][y][z]) || Voxel.isPartiallyTransparent(blocks[x+1][y][z]);
-                        }
                     }
                     
                     // compute total number of visible faces
@@ -316,6 +334,41 @@ public class Chunk extends Drawable {
         glBindBuffer(GL_ARRAY_BUFFER, VBOTextureHandleTranslucent);
         glBufferData(GL_ARRAY_BUFFER, VertexTextureTranslucent, GL_STATIC_DRAW);
         glBindBuffer(GL_ARRAY_BUFFER, 0);
+    }
+    
+    public VoxelType lookupTraverseChunks(int x, int y, int z) {
+        if (y < 0 || y > chunkHeight - 1) {
+            return null;
+        }
+        
+        int xDir = 0;
+        int zDir = 0;
+
+        if (x < 0)
+            xDir = -1;
+        else if (x > chunkSize - 1)
+            xDir = 1;
+
+        if (z < 0)
+            zDir = -1;
+        else if (z > chunkSize -1)
+            zDir = 1;
+        
+        // not traversing chunk boundary, lookup block in this chunk
+        if (xDir == 0 && zDir == 0) {
+            return blocks[x][y][z];
+        }
+        
+        // traversing chunk boundary, lookup adjacent chunk
+        Chunk adjacentChunk = world.findAdjacentChunk(this, xDir, zDir);
+        if (adjacentChunk == null) {
+            return null;
+        }
+
+        // lookup block in adjacent chunk
+        // reason for using Math.floorMod instead of regular mod:
+        // https://stackoverflow.com/questions/4412179/best-way-to-make-javas-modulus-behave-like-it-should-with-negative-numbers/25830153#25830153
+        return adjacentChunk.safeLookup(Math.floorMod(x, chunkSize), y, Math.floorMod(z, chunkSize));
     }
 
     
@@ -406,7 +459,7 @@ public class Chunk extends Drawable {
         int floatsPerFace = 2 * 4;
         int[] t = Voxel.getTexture(v);
         
-        // bottom
+        // top
         if (faceVisible[0]) {
             System.arraycopy(new float[] {
                 offset*(t[2] + 1), offset*(t[3] + 1),
@@ -417,7 +470,7 @@ public class Chunk extends Drawable {
             startIndex += floatsPerFace;
         }
         
-        // top
+        // bottom
         if (faceVisible[1]) {
             System.arraycopy(new float[] {
                 offset*(t[0] + 1), offset*(t[1] + 1),

@@ -15,9 +15,9 @@ import java.util.Random;
 public class WorldGenerator {
     public static void generateRandomWorld(VoxelType[][][] blocks, int numBlocksXZ, int numBlocksY) {
         int maxDelta = 7;
-        int headroom = 2;
+        int headroom = 5;
         Random rand = new Random();
-        SimplexNoise noiseGenHeight = new SimplexNoise(90, 0.35, rand.nextInt());
+        SimplexNoise noiseGenHeight = new SimplexNoise(90, 0.45, rand.nextInt());
         SimplexNoise noiseGenType = new SimplexNoise(45, .1, rand.nextInt());
         
         for (int x = 0; x < numBlocksXZ; x++) {
@@ -32,7 +32,7 @@ public class WorldGenerator {
                 for (int y = 0; y < maxHeight; y++) {
                     Voxel.VoxelType type = Voxel.VoxelType.BEDROCK;
                     
-                    if (y < maxHeight - 1) {
+                    if (y < maxHeight - 2) {
                         if (y >= 1 && y < numBlocksY / 2) {
                             type = Voxel.VoxelType.STONE;
                             if (rand.nextDouble() < 0.001) {

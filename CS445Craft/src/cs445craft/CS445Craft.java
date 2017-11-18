@@ -39,7 +39,6 @@ public class CS445Craft {
     * and checks for collision. It requires a Screen and Camera object.
     **/
     private static void run(Screen screen, Camera camera) {
-        Mouse.setCursorPosition(0,0);
         Mouse.setGrabbed(true);
         
         boolean noClip = false;
@@ -65,6 +64,8 @@ public class CS445Craft {
         int indexz = 0;
         
         while(true) {
+            Mouse.setCursorPosition(0,0);
+            
             // listen for q key
             if (Keyboard.isKeyDown(Keyboard.KEY_ESCAPE) || Keyboard.isKeyDown(Keyboard.KEY_Q)) {
                 screen.close();
@@ -79,14 +80,26 @@ public class CS445Craft {
             if (Mouse.isButtonDown(0)) {
                 if (!lastMouseState) {
                     lastMouseState = true;
+                    
+                    float clickX = (float) (Math.sin(Math.toRadians(camera.yaw)) * Math.cos(Math.toRadians(camera.pitch)));
+                    float clickZ = (float) (Math.cos(Math.toRadians(camera.yaw)) * Math.cos(Math.toRadians(camera.pitch)));
+                    float clickY = (float) Math.sin(Math.toRadians(camera.pitch));
+                    
                     for (float amplitude = 0.5f; amplitude <= Voxel.BLOCK_SIZE * 2; amplitude++) {
-                        float clickX = camera.x - (float) (amplitude * Math.sin(Math.toRadians(camera.yaw)) * Math.cos(Math.toRadians(camera.pitch)));
-                        float clickZ = camera.z + (float) (amplitude * Math.cos(Math.toRadians(camera.yaw)) * Math.cos(Math.toRadians(camera.pitch)));
+                        float projectX = camera.x - amplitude * clickX;
+                        float projectZ = camera.z + amplitude * clickZ;
+                        float projectY = camera.y + amplitude * clickY;
                         
-                        float clickY = camera.y + (float) (amplitude * Math.sin(Math.toRadians(camera.pitch)));
+                        Voxel.VoxelType clickedBlock = w.blockAt(projectX, projectY, projectZ);
+                        if (clickedBlock == null || Voxel.isMineThrough(clickedBlock)) {
+                            continue;
+                        }
                         
-                        if (w.blockAt(clickX, clickY, clickZ)) {
-                            w.removeBlock(clickX, clickY, clickZ);
+                        // check if block can be broken
+                        if (Voxel.isBreakable(clickedBlock)) {
+                            w.removeBlock(projectX, projectY, projectZ);
+                            break;
+                        } else {
                             break;
                         }
                     } 
@@ -151,8 +164,8 @@ public class CS445Craft {
    
             // gravity and jumping
             // listen for jump
-            boolean blockBelow = w.solidBlockAt(camera.x, camera.y + dy + playerHeight, camera.z);
-            boolean blockAbove = w.solidBlockAt(camera.x, camera.y + dy - 0.5f, camera.z);
+            boolean blockBelow = w.solidBlockAt(camera.x, camera.y + dy + playerHeight, camera.z) != null;
+            boolean blockAbove = w.solidBlockAt(camera.x, camera.y + dy - 0.5f, camera.z) != null;
             
             if (noClip) {
                 // skip gravity code if noclip is enabled
@@ -227,14 +240,14 @@ public class CS445Craft {
 
             // player is ~2 blocks tall, so we must check side collision twice on each axis
             float offsetY = playerHeight * sideCollideHeightFactor;
-            boolean willCollideX = w.solidBlockAt(camera.x + dx + offsetX, camera.y + offsetY, camera.z);
-                   willCollideX |= w.solidBlockAt(camera.x + dx + offsetX, camera.y + offsetY - Voxel.BLOCK_SIZE, camera.z);
-            boolean willCollideZ = w.solidBlockAt(camera.x, camera.y + offsetY, camera.z + dz + offsetZ);
-                   willCollideZ |= w.solidBlockAt(camera.x, camera.y + offsetY - Voxel.BLOCK_SIZE, camera.z + dz + offsetZ);
+            boolean willCollideX = w.solidBlockAt(camera.x + dx + offsetX, camera.y + offsetY, camera.z) != null;
+                   willCollideX |= w.solidBlockAt(camera.x + dx + offsetX, camera.y + offsetY - Voxel.BLOCK_SIZE, camera.z) != null;
+            boolean willCollideZ = w.solidBlockAt(camera.x, camera.y + offsetY, camera.z + dz + offsetZ) != null;
+                   willCollideZ |= w.solidBlockAt(camera.x, camera.y + offsetY - Voxel.BLOCK_SIZE, camera.z + dz + offsetZ) != null;
                    
             // special case for when running directly into a corner
-            boolean willCollideXZ = w.solidBlockAt(camera.x + dx + offsetX, camera.y + offsetY, camera.z + dz + offsetZ);
-                   willCollideXZ |= w.solidBlockAt(camera.x + dx + offsetX, camera.y + offsetY - Voxel.BLOCK_SIZE, camera.z + dz + offsetZ);
+            boolean willCollideXZ = w.solidBlockAt(camera.x + dx + offsetX, camera.y + offsetY, camera.z + dz + offsetZ) != null;
+                   willCollideXZ |= w.solidBlockAt(camera.x + dx + offsetX, camera.y + offsetY - Voxel.BLOCK_SIZE, camera.z + dz + offsetZ) != null;
                    
             if (willCollideXZ && !willCollideX && !willCollideZ && !noClip) {
                 dx = 0;
@@ -252,6 +265,14 @@ public class CS445Craft {
             camera.x += dx;
             camera.z += dz;
             camera.y += dy;
+            
+            // check if underwater
+            Voxel.VoxelType blockAtCamera = w.blockAt(camera.x, camera.y, camera.z);
+            if (blockAtCamera == Voxel.VoxelType.WATER) {
+                screen.setTintColor(0.75f, 0.75f, 1.0f);
+            } else {
+                screen.setTintColor(1.0f, 1.0f, 1.0f);
+            }
             
             // look movement
             camera.incYaw(Mouse.getDX() * mouseSens);

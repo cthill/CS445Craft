@@ -52,6 +52,10 @@ public class Voxel {
         );
     }
     
+    public static boolean isSeeTrough(VoxelType v) {
+        return isTranslucent(v) || isPartiallyTransparent(v);
+    }
+    
     public static boolean isSolid(VoxelType v) {
         return !(
             v == VoxelType.WATER ||
@@ -67,6 +71,12 @@ public class Voxel {
         return !(
             v == VoxelType.WATER ||
             v == VoxelType.BEDROCK
+        );
+    }
+    
+    public static boolean isMineThrough(VoxelType v) {
+        return (
+            v == VoxelType.WATER
         );
     }
     

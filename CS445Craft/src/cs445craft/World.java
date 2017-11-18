@@ -9,7 +9,7 @@ import cs445craft.Chunk.VoxelType;
 import java.io.IOException;
 import java.util.Random;
 
-public class World implements Drawable {
+public class World {
     public static final int CHUNK_S = 30; // 30 x 30 x 30 chunk
     public static final int CHUNK_H = 30; // 30 x 30 x 30 chunk
     
@@ -37,6 +37,10 @@ public class World implements Drawable {
                 chunks[i][j] = c;
             }
         }    
+    }
+    
+    public Chunk[][] getChunks() {
+        return chunks;
     }
     
     public float getWorldSize() {
@@ -97,11 +101,11 @@ public class World implements Drawable {
         
         VoxelType[][][] blocks = new VoxelType[numBlocksX][numBlocksY][numBlockzZ];
         
-        int maxDelta = 6;
-        int headroom = 5;
+        int maxDelta = 15;
+        int headroom = 2;
         Random rand = new Random();
-        SimplexNoise noiseGenHeight = new SimplexNoise(30, 0.35, rand.nextInt());
-        SimplexNoise noiseGenType = new SimplexNoise(15, .1, rand.nextInt());
+        SimplexNoise noiseGenHeight = new SimplexNoise(90, 0.35, rand.nextInt());
+        SimplexNoise noiseGenType = new SimplexNoise(45, .1, rand.nextInt());
         
         for (int x = 0; x < numBlocksX; x++) {
             for (int z = 0; z < numBlockzZ; z++) {
@@ -131,7 +135,7 @@ public class World implements Drawable {
                             }
                         } else {
                             type = VoxelType.GRASS;
-                            if (rand.nextDouble() < 0.0025) {
+                            if (rand.nextDouble() < 0.0015) {
                                 addTree(blocks, x,y + 1,z);
                             }
                         }
@@ -214,6 +218,14 @@ public class World implements Drawable {
         for (int i = 0; i < size; i++) {
             for (int j = 0; j < size; j++) {
                 chunks[i][j].draw();
+            }
+        }
+    }
+    
+    public void drawTranslucent() {
+        for (int i = 0; i < size; i++) {
+            for (int j = 0; j < size; j++) {
+                chunks[i][j].drawTranslucent();
             }
         }
     }

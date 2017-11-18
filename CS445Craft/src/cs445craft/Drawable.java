@@ -12,11 +12,15 @@
 ****************************************************************/
 package cs445craft;
 
-public interface Drawable {    
+public abstract class Drawable {    
     /**
     * method: draw
     * purpose: abstract method to draw the object to the screen. Call on each
     * frame.
     **/
-    public void draw();
+    public abstract void draw();
+    
+    public abstract void drawTranslucent();
+    
+    public abstract float distanceTo(float x, float y, float z);
 }

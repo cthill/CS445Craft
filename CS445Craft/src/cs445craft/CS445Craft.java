@@ -39,6 +39,7 @@ public class CS445Craft {
     * and checks for collision. It requires a Screen and Camera object.
     **/
     private static void run(Screen screen, Camera camera) {
+        Mouse.setCursorPosition(0,0);
         Mouse.setGrabbed(true);
         
         boolean noClip = false;
@@ -252,8 +253,16 @@ public class CS445Craft {
             Camera c = new Camera(0,0,0);
             //s = new Screen(1024, 768, "CS445Craft", c);
             s = new Screen(1024, 768, "CS445Craft", c);
-            w = new World(5);
-            s.addObject(w);
+            
+            int worldSize = 5;
+            
+            w = new World(worldSize);
+            Chunk[][] chunks = w.getChunks();
+            for (int i = 0; i < worldSize; i++) {
+                for (int j = 0; j < worldSize; j++) {
+                    s.addObject(chunks[i][j]);
+                }
+            }
             
             float center = w.getWorldSize() / 2;
             c.x = -center;

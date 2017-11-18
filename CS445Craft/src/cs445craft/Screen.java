@@ -16,13 +16,13 @@ package cs445craft;
 
 import java.awt.Font;
 import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.List;
 import org.lwjgl.LWJGLException;
 import org.lwjgl.opengl.Display;
 import org.lwjgl.opengl.DisplayMode;
 import static org.lwjgl.opengl.GL11.*;
 import org.lwjgl.util.glu.GLU;
-import org.newdawn.slick.Color;
 import org.newdawn.slick.TrueTypeFont;
 
 public class Screen {
@@ -40,8 +40,6 @@ public class Screen {
         this.camera = camera;
         objects = new ArrayList<>();
         
-
-        
         // create window
         Display.setFullscreen(false);
         Display.setDisplayMode(new DisplayMode(width, height));
@@ -49,14 +47,12 @@ public class Screen {
         Display.create();
         
         glClearColor(0.5f, 0.85f, 1.0f, 1.0f);
-        
-        
         glEnable(GL_TEXTURE_2D);
-        glEnable(GL_BLEND);
         glEnableClientState (GL_TEXTURE_COORD_ARRAY);
         glEnableClientState(GL_VERTEX_ARRAY);
+        glAlphaFunc(GL_GREATER, 0.5f);
         glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
-        glFrontFace(GL_CW);        
+        glFrontFace(GL_CW);
         
 //        awtFont = new Font("Times New Roman", Font.PLAIN, 24);
 //        font = new TrueTypeFont(awtFont, false);
@@ -88,14 +84,35 @@ public class Screen {
         glHint(GL_PERSPECTIVE_CORRECTION_HINT, GL_NICEST);
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
         
-        // 3d draw
+        // 3d draw prepare
         glColor3f(1.0f,1.0f,1.0f);
         glLoadIdentity();
         glPushMatrix();
         camera.lookThrough();
+
+        // 3d draw solid objects
+        glEnable(GL_ALPHA_TEST);
+        // sort opaque objects front to back
+        objects.sort(Comparator.comparing(object -> object.distanceTo(camera.x, camera.y, camera.z)));
         for (Drawable object: objects) {
             object.draw();
         }
+        glDisable(GL_ALPHA_TEST);
+        
+        // 3d draw translucent objects
+        glEnable(GL_BLEND);
+        glDisable(GL_CULL_FACE);
+        glDepthMask(false);
+        // sort translucent objects back to front
+        objects.sort(Comparator.comparing(object -> ((Drawable) object).distanceTo(camera.x, camera.y, camera.z)).reversed());
+        for (Drawable object: objects) {
+            object.drawTranslucent();
+        }
+        glDepthMask(true);
+        glDisable(GL_BLEND);
+        glEnable(GL_CULL_FACE);
+        
+        // 3d draw finish
         glPopMatrix();
         
         // switch to 2d mode for hud draw

@@ -9,9 +9,9 @@ import cs445craft.Chunk.VoxelType;
 import java.io.IOException;
 import java.util.Random;
 
-public class World implements Drawable {
-    public static final int CHUNK_S = 16; // 30 x 30 x 30 chunk
-    public static final int CHUNK_H = 32; // 30 x 30 x 30 chunk
+public class World {
+    public static final int CHUNK_S = 30; // 30 x 30 x 30 chunk
+    public static final int CHUNK_H = 30; // 30 x 30 x 30 chunk
     
     public static final int NUM_BLOCKS = CHUNK_S * CHUNK_S * CHUNK_H;
     
@@ -39,15 +39,19 @@ public class World implements Drawable {
         }    
     }
     
+    public Chunk[][] getChunks() {
+        return chunks;
+    }
+    
     public float getWorldSize() {
         return CHUNK_S * Chunk.BLOCK_SIZE * size;
     }
     
-    private int worldPosToBlockIndex(float pos) {
+    public int worldPosToBlockIndex(float pos) {
         return -(int) (Math.round(pos / Chunk.BLOCK_SIZE));
     }
     
-    private int blockIndexToChunkNum(int index) {
+    public int blockIndexToChunkNum(int index) {
         return index / CHUNK_S;
     }
     
@@ -97,11 +101,11 @@ public class World implements Drawable {
         
         VoxelType[][][] blocks = new VoxelType[numBlocksX][numBlocksY][numBlockzZ];
         
-        int maxDelta = 6;
-        int headroom = 5;
+        int maxDelta = 15;
+        int headroom = 2;
         Random rand = new Random();
-        SimplexNoise noiseGenHeight = new SimplexNoise(30, 0.35, rand.nextInt());
-        SimplexNoise noiseGenType = new SimplexNoise(15, .1, rand.nextInt());
+        SimplexNoise noiseGenHeight = new SimplexNoise(90, 0.35, rand.nextInt());
+        SimplexNoise noiseGenType = new SimplexNoise(45, .1, rand.nextInt());
         
         for (int x = 0; x < numBlocksX; x++) {
             for (int z = 0; z < numBlockzZ; z++) {
@@ -131,11 +135,7 @@ public class World implements Drawable {
                             }
                         } else {
                             type = VoxelType.GRASS;
-                            if (
-                                x > 3 && z > 3 &&
-                                x < CHUNK_S - 4 && z < CHUNK_S - 4 &&
-                                rand.nextDouble() < 0.05
-                            ) {
+                            if (rand.nextDouble() < 0.0015) {
                                 addTree(blocks, x,y + 1,z);
                             }
                         }
@@ -201,9 +201,9 @@ public class World implements Drawable {
             int yy = blockCoords[i + 1];
             int zz = blockCoords[i + 2];
             if (
-                xx >= 0 && xx < CHUNK_S &&
+                xx >= 0 && xx < CHUNK_S * size &&
                 yy >= 0 && yy < CHUNK_H &&
-                zz >= 0 && zz < CHUNK_S
+                zz >= 0 && zz < CHUNK_S * size
             ) {
                 blocks[xx][yy][zz] = type;
             }
@@ -214,12 +214,24 @@ public class World implements Drawable {
         return chunks[0][0];
     }
     
-    public void draw() {
-        for (int i = 0; i < size; i++) {
-            for (int j = 0; j < size; j++) {
-                chunks[i][j].draw();
-            }
+    public void removeBlock(float x, float y, float z) {
+        int xIndex = worldPosToBlockIndex(x);
+        int yIndex = worldPosToBlockIndex(y);
+        int zIndex = worldPosToBlockIndex(z);
+        
+        int i = blockIndexToChunkNum(xIndex);
+        int j = blockIndexToChunkNum(zIndex);
+        
+        xIndex -= i * CHUNK_S;
+        zIndex -= j * CHUNK_S;
+        yIndex -= -CHUNK_H;
+        
+        if (i < 0 || i >= size || j < 0 || j >= size) {
+            return;
         }
+        
+        chunks[i][j].removeBlock(xIndex, yIndex, zIndex);
+        chunks[i][j].rebuildMesh();
     }
     
     public void swapMeshes() {

@@ -50,9 +50,9 @@ public class Screen {
         glEnable(GL_TEXTURE_2D);
         glEnableClientState (GL_TEXTURE_COORD_ARRAY);
         glEnableClientState(GL_VERTEX_ARRAY);
-        glAlphaFunc(GL_GREATER, 0.75f);
+        glAlphaFunc(GL_GREATER, 0.5f);
         glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
-        glFrontFace(GL_CW);        
+        glFrontFace(GL_CW);
         
 //        awtFont = new Font("Times New Roman", Font.PLAIN, 24);
 //        font = new TrueTypeFont(awtFont, false);

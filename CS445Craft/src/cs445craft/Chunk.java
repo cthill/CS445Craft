@@ -45,8 +45,6 @@ public class Chunk extends Drawable {
         GLASS
     }
     
-    
-    
     public float chunkX, chunkY, chunkZ;
     private VoxelType[][][] blocks;
     

@@ -109,8 +109,6 @@ public class Screen {
             object.drawTranslucent();
         }
         glDepthMask(true);
-        glDisable(GL_BLEND);
-        glEnable(GL_CULL_FACE);
         
         // 3d draw finish
         glPopMatrix();

@@ -42,7 +42,17 @@ public class Chunk extends Drawable {
         TRUNK,
         LEAVES,
         BEDROCK,
-        GLASS
+        GLASS,
+        RED_FLOWER,
+        YELLOW_FLOWER,
+        RED_MUSHROOM,
+        MUSHROOM,
+        TALL_GRASS,
+        REED,
+        COAL,
+        IRON,
+        GOLD,
+        DIAMOND
     }
     
     public float chunkX, chunkY, chunkZ;
@@ -103,6 +113,11 @@ public class Chunk extends Drawable {
     }
 
     public boolean blockAt(int x, int y, int z) {
+        VoxelType block = safeLookup(x, y, z);
+        return block != null;
+    }
+    
+    public boolean solidBlockAt(int x, int y, int z) {
         VoxelType block = safeLookup(x, y, z);
         return block != null && isSolid(block); 
     }
@@ -180,19 +195,42 @@ public class Chunk extends Drawable {
     
     private boolean isPartiallyTransparent(VoxelType v) {
         return (
-            v == VoxelType.LEAVES
+            v == VoxelType.LEAVES ||
+            v == VoxelType.RED_FLOWER ||
+            v == VoxelType.YELLOW_FLOWER ||
+            v == VoxelType.RED_MUSHROOM ||
+            v == VoxelType.MUSHROOM ||
+            v == VoxelType.TALL_GRASS ||
+            v == VoxelType.REED
         );
     }
     
     private boolean isSolid(VoxelType v) {
         return !(
-            v == VoxelType.WATER
+            v == VoxelType.WATER ||
+            v == VoxelType.RED_FLOWER ||
+            v == VoxelType.YELLOW_FLOWER ||
+            v == VoxelType.RED_MUSHROOM ||
+            v == VoxelType.MUSHROOM ||
+            v == VoxelType.TALL_GRASS
         );
     }
     
     private boolean isBreakable(VoxelType v) {
         return !(
+            v == VoxelType.WATER ||
             v == VoxelType.BEDROCK
+        );
+    }
+    
+    private boolean isCrossType(VoxelType v) {
+        return (
+            v == VoxelType.RED_FLOWER ||
+            v == VoxelType.YELLOW_FLOWER ||
+            v == VoxelType.RED_MUSHROOM ||
+            v == VoxelType.MUSHROOM ||
+            v == VoxelType.TALL_GRASS ||
+            v == VoxelType.REED
         );
     }
     
@@ -228,6 +266,21 @@ public class Chunk extends Drawable {
                     
                     // null is used for empty cells
                     if (voxelType == null) {
+                        continue;
+                    }
+                    
+                    if (isCrossType(voxelType)) {
+                        float blockX = (float) (chunkX + x * BLOCK_SIZE);
+                        float blockY = (float) (y * BLOCK_SIZE - chunkHeight * BLOCK_SIZE);
+                        float blockZ = (float) (chunkZ + z * BLOCK_SIZE);
+                        
+                        createCross(positionData, writeIndexPosition, blockX, blockY, blockZ);
+                        writeIndexPosition += floatsPerFacePosition * 4;
+                        
+                        textureCross(textureData, writeIndexTexture, voxelType);
+                        writeIndexTexture += floatsPerFaceTexture * 4;
+                        
+                        totalFaces += 4;
                         continue;
                     }
                     
@@ -418,6 +471,37 @@ public class Chunk extends Drawable {
         }
     }
     
+    private static void createCross(float[] buff, int startIndex, float x, float y, float z) {
+        float s = ((float) BLOCK_SIZE) / 2;
+        int floatsPerFace = 3 * 4;
+        
+        System.arraycopy(new float[] {
+            // FRONT QUAD
+            x + s, y + s, z,
+            x - s, y + s, z,
+            x - s, y - s, z,
+            x + s, y - s, z,
+        
+            // BACK QUAD
+            x + s, y - s, z,
+            x - s, y - s, z,
+            x - s, y + s, z,
+            x + s, y + s, z,
+        
+            // LEFT QUAD
+            x, y + s, z - s,
+            x, y + s, z + s,
+            x, y - s, z + s,
+            x, y - s, z - s,
+        
+            // RIGHT QUAD
+            x, y + s, z + s,
+            x, y + s, z - s,
+            x, y - s, z - s,
+            x, y - s, z + s
+        }, 0, buff, startIndex, floatsPerFace * 4);
+    }
+    
     /**
     * method: getTexture()
     * purpose: Return an array of float vertices that define the texture for
@@ -472,8 +556,24 @@ public class Chunk extends Drawable {
                 btmX = topX = lftX = rhtX = fntX = bckX = 1;
                 btmY = topY = lftY = rhtY = fntY = bckY = 3;
                 break;
+            case COAL:
+                btmX = topX = lftX = rhtX = fntX = bckX = 2;
+                btmY = topY = lftY = rhtY = fntY = bckY = 2;
+                break;
+            case IRON:
+                btmX = topX = lftX = rhtX = fntX = bckX = 1;
+                btmY = topY = lftY = rhtY = fntY = bckY = 2;
+                break;
+            case GOLD:
+                btmX = topX = lftX = rhtX = fntX = bckX = 0;
+                btmY = topY = lftY = rhtY = fntY = bckY = 2;
+                break;
+            case DIAMOND:
+                btmX = topX = lftX = rhtX = fntX = bckX = 2;
+                btmY = topY = lftY = rhtY = fntY = bckY = 3;
+                break;
             default:
-                btmX = topX = lftX = rhtX = fntX = bckX = 10;
+                btmX = topX = lftX = rhtX = fntX = bckX = 11;
                 btmY = topY = lftY = rhtY = fntY = bckY = 1;
                 break;
         }
@@ -546,4 +646,71 @@ public class Chunk extends Drawable {
             startIndex += floatsPerFace;
         }
     }
+    
+     private void textureCross(float[] buff, int startIndex, VoxelType v) {
+        float offset = (2048f/16)/2048f;
+        
+        int fntX, bckX, lftX, rhtX;
+        int fntY, bckY, lftY, rhtY;
+        
+        switch (v) {
+            case RED_FLOWER:
+                lftX = rhtX = fntX = bckX = 12;
+                lftY = rhtY = fntY = bckY = 0;
+                break;
+            case YELLOW_FLOWER:
+                lftX = rhtX = fntX = bckX = 13;
+                lftY = rhtY = fntY = bckY = 0;
+                break;
+            case RED_MUSHROOM:
+                lftX = rhtX = fntX = bckX = 12;
+                lftY = rhtY = fntY = bckY = 1;
+                break;
+            case MUSHROOM:
+                lftX = rhtX = fntX = bckX = 13;
+                lftY = rhtY = fntY = bckY = 1;
+                break;
+            case TALL_GRASS:
+                lftX = rhtX = fntX = bckX = 9;
+                lftY = rhtY = fntY = bckY = 5;
+                break;
+            case REED:
+                lftX = rhtX = fntX = bckX = 9;
+                lftY = rhtY = fntY = bckY = 4;
+                break;
+            default:
+                lftX = rhtX = fntX = bckX = 11;
+                lftY = rhtY = fntY = bckY = 1;
+                break;
+        }
+        
+        int floatsPerFace = 2 * 4;
+        
+        
+        System.arraycopy(new float[] {
+            // front
+            offset*(fntX + 0), offset*(fntY + 0),
+            offset*(fntX + 1), offset*(fntY + 0),
+            offset*(fntX + 1), offset*(fntY + 1),
+            offset*(fntX + 0), offset*(fntY + 1),
+        
+            // back
+            offset*(bckX + 1), offset*(bckY + 1),
+            offset*(bckX + 0), offset*(bckY + 1),
+            offset*(bckX + 0), offset*(bckY + 0),
+            offset*(bckX + 1), offset*(bckY + 0),
+
+            // left
+            offset*(lftX + 0), offset*(lftY + 0),
+            offset*(lftX + 1), offset*(lftY + 0),
+            offset*(lftX + 1), offset*(lftY + 1),
+            offset*(lftX + 0), offset*(lftY + 1),
+
+            // right
+            offset*(rhtX + 0), offset*(rhtY + 0),
+            offset*(rhtX + 1), offset*(rhtY + 0),
+            offset*(rhtX + 1), offset*(rhtY + 1),
+            offset*(rhtX + 0), offset*(rhtY + 1)
+        }, 0, buff, startIndex, floatsPerFace * 4);
+    }       
 }

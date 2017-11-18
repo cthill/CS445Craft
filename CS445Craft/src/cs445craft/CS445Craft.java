@@ -151,8 +151,8 @@ public class CS445Craft {
    
             // gravity and jumping
             // listen for jump
-            boolean blockBelow = w.blockAt(camera.x, camera.y + dy + playerHeight, camera.z);
-            boolean blockAbove = w.blockAt(camera.x, camera.y + dy - 0.5f, camera.z);
+            boolean blockBelow = w.solidBlockAt(camera.x, camera.y + dy + playerHeight, camera.z);
+            boolean blockAbove = w.solidBlockAt(camera.x, camera.y + dy - 0.5f, camera.z);
             
             if (noClip) {
                 // skip gravity code if noclip is enabled
@@ -227,14 +227,14 @@ public class CS445Craft {
 
             // player is ~2 blocks tall, so we must check side collision twice on each axis
             float offsetY = playerHeight * sideCollideHeightFactor;
-            boolean willCollideX = w.blockAt(camera.x + dx + offsetX, camera.y + offsetY, camera.z);
-                   willCollideX |= w.blockAt(camera.x + dx + offsetX, camera.y + offsetY - Chunk.BLOCK_SIZE, camera.z);
-            boolean willCollideZ = w.blockAt(camera.x, camera.y + offsetY, camera.z + dz + offsetZ);
-                   willCollideZ |= w.blockAt(camera.x, camera.y + offsetY - Chunk.BLOCK_SIZE, camera.z + dz + offsetZ);
+            boolean willCollideX = w.solidBlockAt(camera.x + dx + offsetX, camera.y + offsetY, camera.z);
+                   willCollideX |= w.solidBlockAt(camera.x + dx + offsetX, camera.y + offsetY - Chunk.BLOCK_SIZE, camera.z);
+            boolean willCollideZ = w.solidBlockAt(camera.x, camera.y + offsetY, camera.z + dz + offsetZ);
+                   willCollideZ |= w.solidBlockAt(camera.x, camera.y + offsetY - Chunk.BLOCK_SIZE, camera.z + dz + offsetZ);
                    
             // special case for when running directly into a corner
-            boolean willCollideXZ = w.blockAt(camera.x + dx + offsetX, camera.y + offsetY, camera.z + dz + offsetZ);
-                   willCollideXZ |= w.blockAt(camera.x + dx + offsetX, camera.y + offsetY - Chunk.BLOCK_SIZE, camera.z + dz + offsetZ);
+            boolean willCollideXZ = w.solidBlockAt(camera.x + dx + offsetX, camera.y + offsetY, camera.z + dz + offsetZ);
+                   willCollideXZ |= w.solidBlockAt(camera.x + dx + offsetX, camera.y + offsetY - Chunk.BLOCK_SIZE, camera.z + dz + offsetZ);
                    
             if (willCollideXZ && !willCollideX && !willCollideZ && !noClip) {
                 dx = 0;

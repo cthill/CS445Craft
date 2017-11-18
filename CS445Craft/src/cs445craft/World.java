@@ -74,6 +74,25 @@ public class World {
         return chunks[i][j].blockAt(xIndex, yIndex, zIndex);
     }
     
+    public boolean solidBlockAt(float x, float y, float z) {
+        int xIndex = worldPosToBlockIndex(x);
+        int yIndex = worldPosToBlockIndex(y);
+        int zIndex = worldPosToBlockIndex(z);
+        
+        int i = blockIndexToChunkNum(xIndex);
+        int j = blockIndexToChunkNum(zIndex);
+        
+        xIndex -= i * CHUNK_S;
+        zIndex -= j * CHUNK_S;
+        yIndex -= -CHUNK_H;
+        
+        if (i < 0 || i >= size || j < 0 || j >= size) {
+            return false;
+        }
+        
+        return chunks[i][j].solidBlockAt(xIndex, yIndex, zIndex);
+    }
+    
     public float depthAt(float x, float y, float z) {
         int xIndex = worldPosToBlockIndex(x);
         int yIndex = worldPosToBlockIndex(y);
@@ -101,7 +120,7 @@ public class World {
         
         VoxelType[][][] blocks = new VoxelType[numBlocksX][numBlocksY][numBlockzZ];
         
-        int maxDelta = 15;
+        int maxDelta = 7;
         int headroom = 2;
         Random rand = new Random();
         SimplexNoise noiseGenHeight = new SimplexNoise(90, 0.35, rand.nextInt());
@@ -120,8 +139,20 @@ public class World {
                     VoxelType type = VoxelType.BEDROCK;
                     
                     if (y < maxHeight - 1) {
-                        if (y > 2 && y < CHUNK_H / 2) {
+                        if (y >= 1 && y < CHUNK_H / 2) {
                             type = VoxelType.STONE;
+                            if (rand.nextDouble() < 0.001) {
+                                if (y < 6)
+                                    addOreVein(blocks, x, y, z, VoxelType.DIAMOND);
+                                else if (y < 10)
+                                    addOreVein(blocks, x, y, z, VoxelType.GOLD);
+                            } else if (rand.nextDouble() < 0.05 && y < 16) {
+                                if (rand.nextDouble() < 0.5)
+                                    addOreVein(blocks, x, y, z, VoxelType.IRON);
+                                else
+                                    addOreVein(blocks, x, y, z, VoxelType.COAL);
+                            }
+                            
                         } else if (y >= CHUNK_H / 2) {
                             type = VoxelType.DIRT;
                         }
@@ -132,12 +163,27 @@ public class World {
                                 type = VoxelType.WATER;
                             } else {
                                 type = VoxelType.SAND;
+                                if (rand.nextDouble() < 0.005) {
+                                    blocks[x][y+1][z] = VoxelType.REED;
+                                    blocks[x][y+2][z] = VoxelType.REED;
+                                    blocks[x][y+3][z] = VoxelType.REED;
+                                }
                             }
                         } else {
                             type = VoxelType.GRASS;
-                            if (rand.nextDouble() < 0.0015) {
+                            
+                            if (rand.nextDouble() < 0.05) 
+                                blocks[x][y+1][z] = VoxelType.TALL_GRASS;
+                            if (rand.nextDouble() < 0.0040)
+                                blocks[x][y+1][z] = VoxelType.RED_FLOWER;
+                            if (rand.nextDouble() < 0.0040)
+                                blocks[x][y+1][z] = VoxelType.YELLOW_FLOWER;
+                            if (rand.nextDouble() < 0.001)
+                                blocks[x][y+1][z] = VoxelType.RED_MUSHROOM;
+                            if (rand.nextDouble() < 0.001)
+                                blocks[x][y+1][z] = VoxelType.MUSHROOM;
+                            if (rand.nextDouble() < 0.0015)
                                 addTree(blocks, x,y + 1,z);
-                            }
                         }
                     }
                     blocks[x][y][z] = type;
@@ -148,22 +194,64 @@ public class World {
         return blocks;
     }
     
+    public void addOreVein(VoxelType[][][] blocks, int x, int y, int z, VoxelType v) {
+        Random rand = new Random();
+        
+        int max = 8;
+        int min = 2;
+        int length = rand.nextInt(max - min + 1) + min;
+        int[] coords = new int[length * 3];
+        
+        // add starting position
+        coords[0] = x;
+        coords[1] = y;
+        coords[2] = z;
+        
+        for (int i = 3; i < length * 3 - 2; i += 3) {
+            int px = coords[i - 3];
+            int py = coords[i - 2];
+            int pz = coords[i - 1];
+            
+            double val = rand.nextDouble();
+            if (val < 0.16666)
+                px += 1;
+            else if (val < 0.3333)
+                px -= 1;
+            else if (val < 0.3333)
+                px -= 1;
+            else if (val < 0.5)
+                py += 1;
+            else if (val < 0.6666)
+                py -= 1;
+            else if (val < 0.75)
+                pz += 1;
+            else if (val < 0.9166)
+                pz -= 1;
+            
+            coords[i] = px;
+            coords[i + 1] = py;
+            coords[i + 2] = pz;
+        }
+        
+        addBlocks(blocks, coords, v);
+    }
+    
     /**
     * method: addTree()
     * purpose: Add a simple tree to the blocks array at a given x,y,z. Uses the
     * addBlocks method (which includes bounds checking) to place the blocks.
     **/
     public void addTree(VoxelType[][][] blocks, int x, int y, int z) {
-        int[] trunkCords = new int[] {
+        int[] trunkCoords = new int[] {
             x, y++, z,
             x, y++, z,
             x, y++, z,
             x, y, z,
             x, y+1, z,
         };
-        addBlocks(blocks, trunkCords, VoxelType.TRUNK);
+        addBlocks(blocks, trunkCoords, VoxelType.TRUNK);
         
-        int[] leafCords = new int[] {
+        int[] leafCoords = new int[] {
             // layer 1
             x+1, y, z,
             x-1, y, z,
@@ -187,7 +275,7 @@ public class World {
             x, y, z+1,
             x, y++, z
         };
-        addBlocks(blocks, leafCords, VoxelType.LEAVES);
+        addBlocks(blocks, leafCoords, VoxelType.LEAVES);
     }
     
     /**
@@ -205,7 +293,9 @@ public class World {
                 yy >= 0 && yy < CHUNK_H &&
                 zz >= 0 && zz < CHUNK_S * size
             ) {
-                blocks[xx][yy][zz] = type;
+                if (blocks[xx][yy][zz] != VoxelType.BEDROCK) {
+                    blocks[xx][yy][zz] = type;
+                }
             }
         }
     }

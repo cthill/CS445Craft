@@ -23,6 +23,7 @@ public class Camera {
         this.x = x;
         this.y = y;
         this.z = z;
+        pitch = 180.0f;
     }
     
     /**
@@ -56,6 +57,6 @@ public class Camera {
     public void lookThrough() {
         glRotatef(pitch, 1.0f, 0.0f, 0.0f);
         glRotatef(yaw, 0.0f, 1.0f, 0.0f);
-        glTranslatef(x, y, z);
+        glTranslatef(-x, -y, -z);
     }
 }

@@ -16,6 +16,7 @@ package cs445craft;
 
 import java.awt.Font;
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.Comparator;
 import java.util.List;
 import org.lwjgl.LWJGLException;
@@ -26,6 +27,7 @@ import org.lwjgl.util.glu.GLU;
 import org.newdawn.slick.TrueTypeFont;
 
 public class Screen {
+    private static final int DRAW_DIST = World.CHUNK_S * Voxel.BLOCK_SIZE * 5;
     private int width, height;
     private float r, g, b;
     private String title;
@@ -71,6 +73,10 @@ public class Screen {
         objects.add(object);
     }
     
+    public void addObjects(Collection< ? extends Drawable> coll) {
+        objects.addAll(coll);
+    }
+    
     public void setTintColor(float r, float g, float b) {
         this.r = r;
         this.g = g;
@@ -103,9 +109,11 @@ public class Screen {
         // 3d draw solid objects
         glEnable(GL_ALPHA_TEST);
         // sort opaque objects front to back
-        objects.sort(Comparator.comparing(object -> object.distanceTo(camera.x, camera.y, camera.z)));
+        objects.sort(Comparator.comparing(object -> ((Drawable) object).distanceTo(camera.x, camera.y, camera.z)).reversed());
         for (Drawable object: objects) {
-            object.draw();
+            if (object.distanceTo(camera.x, object.getY(), camera.z) <= DRAW_DIST) {
+                object.draw();
+            }
         }
         glDisable(GL_ALPHA_TEST);
         
@@ -114,9 +122,11 @@ public class Screen {
         glDisable(GL_CULL_FACE);
         glDepthMask(false);
         // sort translucent objects back to front
-        objects.sort(Comparator.comparing(object -> ((Drawable) object).distanceTo(camera.x, camera.y, camera.z)).reversed());
+        objects.sort(Comparator.comparing(object -> object.distanceTo(camera.x, camera.y, camera.z)));
         for (Drawable object: objects) {
-            object.drawTranslucent();
+            if (object.distanceTo(camera.x, object.getY(), camera.z) <= DRAW_DIST) {
+                object.drawTranslucent();
+            }
         }
         glDepthMask(true);
         

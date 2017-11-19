@@ -23,4 +23,8 @@ public abstract class Drawable {
     public abstract void drawTranslucent();
     
     public abstract float distanceTo(float x, float y, float z);
+    
+    public abstract float getX();
+    public abstract float getY();
+    public abstract float getZ();
 }

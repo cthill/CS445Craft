@@ -7,7 +7,9 @@ package cs445craft;
 
 import cs445craft.Voxel.VoxelType;
 import java.io.IOException;
+import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 
 public class World {
@@ -16,14 +18,17 @@ public class World {
     
     public static final int NUM_BLOCKS = CHUNK_S * CHUNK_S * CHUNK_H;
     
-    private int size;
-    private Chunk[][] chunks;
+    private int size;    
+    private Map<Integer, Map<Integer, Chunk>> chunks;
     private Map<Chunk, Integer> chunkToIndexI;
     private Map<Chunk, Integer> chunkToIndexJ;
     
     public World(int size) throws IOException {
         this.size = size;
-        chunks = new Chunk[size][size];
+        chunks = new HashMap<>();
+        for (int i = 0; i < size; i++) {
+            chunks.put(i, new HashMap<>());
+        }
         
         // generate a large random world
         VoxelType[][][] world = new VoxelType[size * CHUNK_S][CHUNK_H][size * CHUNK_S];
@@ -39,24 +44,34 @@ public class World {
                 float offsetX = CHUNK_S * i;
                 float offsetZ = CHUNK_S * j;
                 
-                Chunk c = new Chunk(this, offsetX * Voxel.BLOCK_SIZE, 0, offsetZ * Voxel.BLOCK_SIZE, CHUNK_S, CHUNK_H);
+                Chunk c = new Chunk(this, offsetX * Voxel.BLOCK_SIZE, offsetZ * Voxel.BLOCK_SIZE, CHUNK_S, CHUNK_H);
                 c.copyBlocks(world, i * CHUNK_S, CHUNK_S, 0, CHUNK_H, j * CHUNK_S, CHUNK_S);
-                chunks[i][j] = c;
-                chunkToIndexI.put(c, i);
-                chunkToIndexJ.put(c, j);
+                addChunk(i, j, c);                
             }
         }
-        
-        Chunk cc;
-        cc = findAdjacentChunk(chunks[1][0], -1, 0);
-        System.out.println(chunkToIndexI.get(cc) + " " +  chunkToIndexJ.get(cc));
         
         // build all the meshes
         for (int i = 0; i < size; i++) {
             for (int j = 0; j < size; j++) {
-                chunks[i][j].rebuildMesh();
+                getChunk(i, j).rebuildMesh();
             }
         }
+    }
+    
+    private void addChunk(int i, int j, Chunk c) {
+        if (chunks.get(i) == null) {
+            chunks.put(i, new HashMap<>());
+        }
+        chunks.get(i).put(j, c);
+        chunkToIndexI.put(c, i);
+        chunkToIndexJ.put(c, j);
+    }
+    
+    private Chunk getChunk(int i, int j) {
+        if (chunks.get(i) == null) {
+            return null;
+        }
+        return chunks.get(i).get(j);
     }
     
     public Chunk findAdjacentChunk(Chunk thisChunk, int xDir, int zDir) {
@@ -76,27 +91,35 @@ public class World {
         else if (zDir > 0)
             j++;
         
-        if (i < 0 || i > size - 1 || j < 0 || j > size -1) {
-            return null;
+        return getChunk(i, j);
+    }
+    
+    public List<Chunk> getChunks() {
+        List<Chunk> chunksList = new ArrayList<>();
+        for (Map<Integer, Chunk> map : chunks.values()) {
+            chunksList.addAll(map.values());
         }
-        
-        return chunks[i][j];
+        return chunksList;
     }
     
-    public Chunk[][] getChunks() {
-        return chunks;
-    }
-    
-    public float getWorldSize() {
+    public float getWidth() {
         return CHUNK_S * Voxel.BLOCK_SIZE * size;
     }
     
+    public int getSize() {
+        return size;
+    }
+    
     public int worldPosToBlockIndex(float pos) {
-        return -(int) (Math.round(pos / Voxel.BLOCK_SIZE));
+        return (int) (Math.round(pos / Voxel.BLOCK_SIZE));
     }
     
     public int blockIndexToChunkNum(int index) {
         return index / CHUNK_S;
+    }
+    
+    public float blockIndexToWorldPos(int index) {
+        return (float) index * Voxel.BLOCK_SIZE;
     }
     
     public VoxelType blockAt(float x, float y, float z) {
@@ -106,16 +129,13 @@ public class World {
         
         int i = blockIndexToChunkNum(xIndex);
         int j = blockIndexToChunkNum(zIndex);
-        
-        xIndex -= i * CHUNK_S;
-        zIndex -= j * CHUNK_S;
-        yIndex += CHUNK_H;
-        
-        if (i < 0 || i >= size || j < 0 || j >= size) {
-            return null;
+
+        Chunk c = getChunk(i, j);
+        if (c != null) {
+            return c.blockAt(xIndex % CHUNK_S, yIndex, zIndex % CHUNK_S);
         }
         
-        return chunks[i][j].blockAt(xIndex, yIndex, zIndex);
+        return null;
     }
     
     public VoxelType solidBlockAt(float x, float y, float z) {
@@ -126,15 +146,12 @@ public class World {
         int i = blockIndexToChunkNum(xIndex);
         int j = blockIndexToChunkNum(zIndex);
         
-        xIndex -= i * CHUNK_S;
-        zIndex -= j * CHUNK_S;
-        yIndex -= - CHUNK_H;
-        
-        if (i < 0 || i >= size || j < 0 || j >= size) {
-            return null;
+        Chunk c = getChunk(i, j);
+        if (c != null) {
+            return c.solidBlockAt(xIndex % CHUNK_S, yIndex, zIndex % CHUNK_S);
         }
         
-        return chunks[i][j].solidBlockAt(xIndex, yIndex, zIndex);
+        return null;
     }
     
     public float depthAt(float x, float y, float z) {
@@ -145,15 +162,12 @@ public class World {
         int i = blockIndexToChunkNum(xIndex);
         int j = blockIndexToChunkNum(zIndex);
         
-        xIndex -= i * CHUNK_S;
-        zIndex -= j * CHUNK_S;
-        yIndex -= -CHUNK_H;
+        Chunk c = getChunk(i, j);
+        if (c != null) {
+            return blockIndexToWorldPos(c.depthAt(xIndex % CHUNK_S, yIndex, zIndex % CHUNK_S));
+        }
         
-        return chunks[i][j].depthAt(xIndex, yIndex, zIndex);
-    }
-    
-    public Chunk coordsToChunk(float x, float z) {
-        return chunks[0][0];
+        return 0.0f;
     }
     
     public void removeBlock(float x, float y, float z) {
@@ -164,21 +178,16 @@ public class World {
         int i = blockIndexToChunkNum(xIndex);
         int j = blockIndexToChunkNum(zIndex);
         
-        xIndex -= i * CHUNK_S;
-        zIndex -= j * CHUNK_S;
-        yIndex -= -CHUNK_H;
-        
-        if (i < 0 || i >= size || j < 0 || j >= size) {
-            return;
+        Chunk c = getChunk(i, j);
+        if (c != null) {
+            c.removeBlock(xIndex % CHUNK_S, yIndex, zIndex % CHUNK_S);
         }
-        
-        chunks[i][j].removeBlock(xIndex, yIndex, zIndex);
     }
     
     public void swapMeshes() {
         for (int i = 0; i < size; i++) {
             for (int j = 0; j < size; j++) {
-                chunks[i][j].swapMesh();
+                getChunk(i, j).swapMesh();
             }
         }
     }

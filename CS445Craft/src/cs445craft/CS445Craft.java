@@ -24,16 +24,6 @@ public class CS445Craft {
     private static World w;
     
     /**
-    * method: coordsToChunk
-    * purpose: return the chunk a pair of xy coordinates occupies. In the future,
-    * this method will support mulitple chunks.
-    **/
-    private static Chunk coordsToChunk(float x, float z) {
-        // TODO: allow for more chunks
-        return w.coordsToChunk(x, z);
-    }
-    
-    /**
     * method: run
     * purpose: The main event loop of the game. Collects user input, moves camera,
     * and checks for collision. It requires a Screen and Camera object.
@@ -46,7 +36,7 @@ public class CS445Craft {
         float mouseSens = 0.09f;
         float speed = .20f;
         float gravity = 0.025f;
-        float terminalVelocity = speed * 5;
+        float terminalVelocity = -speed * 5;
         float jumpSpeed = 0.40f;
         float yspeed = 0.0f;
         
@@ -81,13 +71,13 @@ public class CS445Craft {
                 if (!lastMouseState) {
                     lastMouseState = true;
                     
-                    float clickX = (float) (Math.sin(Math.toRadians(camera.yaw)) * Math.cos(Math.toRadians(camera.pitch)));
-                    float clickZ = (float) (Math.cos(Math.toRadians(camera.yaw)) * Math.cos(Math.toRadians(camera.pitch)));
-                    float clickY = (float) Math.sin(Math.toRadians(camera.pitch));
+                    float clickX = (float) (Math.sin(Math.toRadians(camera.yaw)) * Math.cos(Math.toRadians(-camera.pitch)));
+                    float clickZ = (float) (Math.cos(Math.toRadians(camera.yaw)) * Math.cos(Math.toRadians(-camera.pitch)));
+                    float clickY = (float)  Math.sin(Math.toRadians(-camera.pitch));
                     
                     for (float amplitude = 0.5f; amplitude <= Voxel.BLOCK_SIZE * 2; amplitude++) {
-                        float projectX = camera.x - amplitude * clickX;
-                        float projectZ = camera.z + amplitude * clickZ;
+                        float projectX = camera.x + amplitude * clickX;
+                        float projectZ = camera.z - amplitude * clickZ;
                         float projectY = camera.y + amplitude * clickY;
                         
                         Voxel.VoxelType clickedBlock = w.blockAt(projectX, projectY, projectZ);
@@ -164,32 +154,31 @@ public class CS445Craft {
    
             // gravity and jumping
             // listen for jump
-            boolean blockBelow = w.solidBlockAt(camera.x, camera.y + dy + playerHeight, camera.z) != null;
-            boolean blockAbove = w.solidBlockAt(camera.x, camera.y + dy - 0.5f, camera.z) != null;
+            boolean blockBelow = w.solidBlockAt(camera.x, camera.y + dy - playerHeight, camera.z) != null;
+            boolean blockAbove = w.solidBlockAt(camera.x, camera.y + dy + 0.5f, camera.z) != null;
             
             if (noClip) {
                 // skip gravity code if noclip is enabled
                 if (Keyboard.isKeyDown(Keyboard.KEY_SPACE))
-                    camera.y -= speed;
-                if (Keyboard.isKeyDown(Keyboard.KEY_LSHIFT))
                     camera.y += speed;
+                if (Keyboard.isKeyDown(Keyboard.KEY_LSHIFT))
+                    camera.y -= speed;
                 dy = 0;
                 yspeed = 0;
             }  else if (blockBelow) {
                 yspeed = 0;
                 dy = 0;
                 // prevent player from getting stuck in floor if they have high y speed
-                float depth = w.depthAt(camera.x, camera.y, camera.z);
-                camera.y = World.CHUNK_H * Voxel.BLOCK_SIZE - depth * Voxel.BLOCK_SIZE - playerHeight - .75f;
+                camera.y = w.depthAt(camera.x, camera.y, camera.z) + playerHeight + 0.75f;
                 //camera.y = Math.round(camera.y - 0.5f);
             } else {
-                if (blockAbove && yspeed < 0) {
+                if (blockAbove && yspeed > 0) {
                     yspeed = 0;
                 }
                 
                 // accelerate on the yaxis for the next frame
-                yspeed += gravity;
-                if (yspeed > terminalVelocity) {
+                yspeed -= gravity;
+                if (yspeed < terminalVelocity) {
                     yspeed = terminalVelocity;
                 }
             }
@@ -197,29 +186,28 @@ public class CS445Craft {
             if (Keyboard.isKeyDown(Keyboard.KEY_SPACE) && blockBelow && !noClip) {
                 if (!lastSpaceState) {
                     lastSpaceState = true;
-                    yspeed = -jumpSpeed;
+                    yspeed = jumpSpeed;
                 }
             } else {
                 lastSpaceState = false;
             }
-            
 
             // world movement
             // listen for movement keys
             if (Keyboard.isKeyDown(Keyboard.KEY_W)) {
-                dx += -speed * (float) Math.sin(Math.toRadians(camera.yaw));
-                dz += speed * (float) Math.cos(Math.toRadians(camera.yaw));
-            } else if (Keyboard.isKeyDown(Keyboard.KEY_S)) {
                 dx += speed * (float) Math.sin(Math.toRadians(camera.yaw));
                 dz += -speed * (float) Math.cos(Math.toRadians(camera.yaw));
+            } else if (Keyboard.isKeyDown(Keyboard.KEY_S)) {
+                dx += -speed * (float) Math.sin(Math.toRadians(camera.yaw));
+                dz += speed * (float) Math.cos(Math.toRadians(camera.yaw));
             }
             
             if (Keyboard.isKeyDown(Keyboard.KEY_A)) {
-                dx += -speed * (float)Math.sin(Math.toRadians(camera.yaw-90));
-                dz += speed * (float)Math.cos(Math.toRadians(camera.yaw-90));
-            } else if (Keyboard.isKeyDown(Keyboard.KEY_D)) {
                 dx += speed * (float)Math.sin(Math.toRadians(camera.yaw-90));
                 dz += -speed * (float)Math.cos(Math.toRadians(camera.yaw-90));
+            } else if (Keyboard.isKeyDown(Keyboard.KEY_D)) {
+                dx += -speed * (float)Math.sin(Math.toRadians(camera.yaw-90));
+                dz += speed * (float)Math.cos(Math.toRadians(camera.yaw-90));
             }
             
             float offsetX, offsetZ, offsetXZ;
@@ -240,14 +228,14 @@ public class CS445Craft {
 
             // player is ~2 blocks tall, so we must check side collision twice on each axis
             float offsetY = playerHeight * sideCollideHeightFactor;
-            boolean willCollideX = w.solidBlockAt(camera.x + dx + offsetX, camera.y + offsetY, camera.z) != null;
-                   willCollideX |= w.solidBlockAt(camera.x + dx + offsetX, camera.y + offsetY - Voxel.BLOCK_SIZE, camera.z) != null;
-            boolean willCollideZ = w.solidBlockAt(camera.x, camera.y + offsetY, camera.z + dz + offsetZ) != null;
-                   willCollideZ |= w.solidBlockAt(camera.x, camera.y + offsetY - Voxel.BLOCK_SIZE, camera.z + dz + offsetZ) != null;
+            boolean willCollideX = w.solidBlockAt(camera.x + dx + offsetX, camera.y - offsetY, camera.z) != null;
+                   willCollideX |= w.solidBlockAt(camera.x + dx + offsetX, camera.y - offsetY + Voxel.BLOCK_SIZE, camera.z) != null;
+            boolean willCollideZ = w.solidBlockAt(camera.x, camera.y - offsetY, camera.z + dz + offsetZ) != null;
+                   willCollideZ |= w.solidBlockAt(camera.x, camera.y - offsetY + Voxel.BLOCK_SIZE, camera.z + dz + offsetZ) != null;
                    
             // special case for when running directly into a corner
-            boolean willCollideXZ = w.solidBlockAt(camera.x + dx + offsetX, camera.y + offsetY, camera.z + dz + offsetZ) != null;
-                   willCollideXZ |= w.solidBlockAt(camera.x + dx + offsetX, camera.y + offsetY - Voxel.BLOCK_SIZE, camera.z + dz + offsetZ) != null;
+            boolean willCollideXZ = w.solidBlockAt(camera.x + dx + offsetX, camera.y - offsetY, camera.z + dz + offsetZ) != null;
+                   willCollideXZ |= w.solidBlockAt(camera.x + dx + offsetX, camera.y - offsetY + Voxel.BLOCK_SIZE, camera.z + dz + offsetZ) != null;
                    
             if (willCollideXZ && !willCollideX && !willCollideZ && !noClip) {
                 dx = 0;
@@ -298,16 +286,12 @@ public class CS445Craft {
             int worldSize = 5;
             
             w = new World(worldSize);
-            Chunk[][] chunks = w.getChunks();
-            for (int i = 0; i < worldSize; i++) {
-                for (int j = 0; j < worldSize; j++) {
-                    s.addObject(chunks[i][j]);
-                }
-            }
+            s.addObjects(w.getChunks());
             
-            float center = w.getWorldSize() / 2;
-            c.x = -center;
-            c.z = -center;
+            float center = w.getWidth() / 2;
+            c.x = center;
+            c.z = center;
+            c.y = World.CHUNK_H * Voxel.BLOCK_SIZE;
             
             run(s, c);
         } catch (LWJGLException ex) {

@@ -20,7 +20,7 @@ import java.util.Set;
  * @author cthill
  */
 public class WorldGenerator {
-    private static final int CHUNK_GENERATION_BOUNDARY = 3;
+    private static final int CHUNK_GENERATION_BOUNDARY = 2;
     private int seed;
     private Random rand;
     
@@ -61,8 +61,8 @@ public class WorldGenerator {
     public List<Chunk> newChunkPosition(int i, int j) {
         List<Chunk> newChunks = new ArrayList<>();
 
-        for (int di = -CHUNK_GENERATION_BOUNDARY; di < CHUNK_GENERATION_BOUNDARY; di++) {
-            for (int dj = -CHUNK_GENERATION_BOUNDARY; dj < CHUNK_GENERATION_BOUNDARY; dj++) {
+        for (int di = -CHUNK_GENERATION_BOUNDARY; di <= CHUNK_GENERATION_BOUNDARY; di++) {
+            for (int dj = -CHUNK_GENERATION_BOUNDARY; dj <= CHUNK_GENERATION_BOUNDARY; dj++) {
                 if (world.getChunk(i + di, j + dj) == null) {
                     Chunk c = generateRandomChunk(i + di, j + dj);
                     world.addChunk(i + di, j + dj, c);

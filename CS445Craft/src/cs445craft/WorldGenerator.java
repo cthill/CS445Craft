@@ -20,6 +20,7 @@ import java.util.Set;
  * @author cthill
  */
 public class WorldGenerator {
+    private static final int CHUNK_GENERATION_BOUNDARY = 3;
     private int seed;
     private Random rand;
     
@@ -59,32 +60,23 @@ public class WorldGenerator {
     
     public List<Chunk> newChunkPosition(int i, int j) {
         List<Chunk> newChunks = new ArrayList<>();
-        int s = 1;
-        
-        newChunkPositionHelper(i,  0, j,  0, newChunks);
-        newChunkPositionHelper(i,  s, j,  0, newChunks);
-        newChunkPositionHelper(i, -s, j,  0, newChunks);
-        newChunkPositionHelper(i,  s, j,  s, newChunks);
-        newChunkPositionHelper(i, -s, j,  s, newChunks);
-        newChunkPositionHelper(i,  s, j, -s, newChunks);
-        newChunkPositionHelper(i, -s, j, -s, newChunks);
-        newChunkPositionHelper(i,  0, j,  s, newChunks);
-        newChunkPositionHelper(i,  0, j, -s, newChunks);
-        
-        Set<Chunk> adjacentChunks = new HashSet<>();
-        adjacentChunks.addAll(newChunks);
-        newChunks.forEach(chunk -> adjacentChunks.addAll(world.findAdjacent(chunk)));
-        adjacentChunks.forEach(chunk -> chunk.rebuildMesh());
-        
-        return newChunks;
-    }
-    
-    private void newChunkPositionHelper(int i, int di, int j, int dj, List<Chunk> newChunks) {
-        if (world.getChunk(i + di, j + dj) == null) {
-            Chunk c = generateRandomChunk(i + di, j + dj);
-            world.addChunk(i + di, j + dj, c);
-            newChunks.add(c);
+
+        for (int di = -CHUNK_GENERATION_BOUNDARY; di < CHUNK_GENERATION_BOUNDARY; di++) {
+            for (int dj = -CHUNK_GENERATION_BOUNDARY; dj < CHUNK_GENERATION_BOUNDARY; dj++) {
+                if (world.getChunk(i + di, j + dj) == null) {
+                    Chunk c = generateRandomChunk(i + di, j + dj);
+                    world.addChunk(i + di, j + dj, c);
+                    newChunks.add(c);
+                }
+            }
         }
+
+        Set<Chunk> newAndAdjacentChunks = new HashSet<>();
+        newAndAdjacentChunks.addAll(newChunks);
+        newChunks.forEach(chunk -> newAndAdjacentChunks.addAll(world.findAdjacent(chunk)));
+        newAndAdjacentChunks.forEach(chunk -> chunk.rebuildMesh());
+
+        return newChunks;
     }
     
     private Chunk generateRandomChunk(int i, int j) {

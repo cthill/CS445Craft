@@ -323,7 +323,6 @@ public class Chunk extends Drawable {
         numVisibleFaces = totalFaces;
         numVisibleFacesTranslucent = totalFacesTranslucent;
         
-        
         VBOVertexHandle = glGenBuffers();
         VBOTextureHandle = glGenBuffers();
         VBOVertexHandleTranslucent = glGenBuffers();

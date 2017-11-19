@@ -27,7 +27,7 @@ import org.lwjgl.util.glu.GLU;
 import org.newdawn.slick.TrueTypeFont;
 
 public class Screen {
-    private static final int DRAW_DIST = World.CHUNK_S * Voxel.BLOCK_SIZE * 5;
+    private static final int DRAW_DIST = World.CHUNK_S * Voxel.BLOCK_SIZE * 3;
     private int width, height;
     private float r, g, b;
     private String title;

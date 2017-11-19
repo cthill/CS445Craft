@@ -6,34 +6,114 @@
 package cs445craft;
 
 import cs445craft.Voxel.VoxelType;
+import static cs445craft.World.CHUNK_H;
+import static cs445craft.World.CHUNK_S;
+import java.io.IOException;
+import java.util.ArrayList;
+import java.util.HashSet;
+import java.util.List;
 import java.util.Random;
+import java.util.Set;
 
 /**
  *
  * @author cthill
  */
 public class WorldGenerator {
-    public static void generateRandomWorld(VoxelType[][][] blocks, int numBlocksXZ, int numBlocksY) {
+    private int seed;
+    private Random rand;
+    
+    private SimplexNoise noiseGenHeight;
+    private SimplexNoise noiseGenType;
+    private World world;
+    
+    public WorldGenerator(int seed) {
+        this.seed = seed;
+        this.rand = new Random();
+        
+        noiseGenHeight = new SimplexNoise(90, 0.40, seed);
+        noiseGenType = new SimplexNoise(45, .1, seed + 1);
+    }
+    
+    public World getOrGenerate() {
+        if (world != null) {
+            return world;
+        }
+        
+        int initialSize = 3;
+        
+        world = new World(initialSize);
+        
+        for (int i = 0; i < initialSize; i++) {
+            for (int j = 0; j < initialSize; j++) {
+                Chunk c = generateRandomChunk(i, j);
+                world.addChunk(i, j, c);
+            }
+        }
+        
+        // rebuild all the meshes
+        world.getChunks().forEach(chunk -> chunk.rebuildMesh());
+        
+        return world;
+    }
+    
+    public List<Chunk> newChunkPosition(int i, int j) {
+        List<Chunk> newChunks = new ArrayList<>();
+        int s = 1;
+        
+        newChunkPositionHelper(i,  0, j,  0, newChunks);
+        newChunkPositionHelper(i,  s, j,  0, newChunks);
+        newChunkPositionHelper(i, -s, j,  0, newChunks);
+        newChunkPositionHelper(i,  s, j,  s, newChunks);
+        newChunkPositionHelper(i, -s, j,  s, newChunks);
+        newChunkPositionHelper(i,  s, j, -s, newChunks);
+        newChunkPositionHelper(i, -s, j, -s, newChunks);
+        newChunkPositionHelper(i,  0, j,  s, newChunks);
+        newChunkPositionHelper(i,  0, j, -s, newChunks);
+        
+        Set<Chunk> adjacentChunks = new HashSet<>();
+        adjacentChunks.addAll(newChunks);
+        newChunks.forEach(chunk -> adjacentChunks.addAll(world.findAdjacent(chunk)));
+        adjacentChunks.forEach(chunk -> chunk.rebuildMesh());
+        
+        return newChunks;
+    }
+    
+    private void newChunkPositionHelper(int i, int di, int j, int dj, List<Chunk> newChunks) {
+        if (world.getChunk(i + di, j + dj) == null) {
+            Chunk c = generateRandomChunk(i + di, j + dj);
+            world.addChunk(i + di, j + dj, c);
+            newChunks.add(c);
+        }
+    }
+    
+    private Chunk generateRandomChunk(int i, int j) {
+        int chunkX = i * CHUNK_S * Voxel.BLOCK_SIZE;
+        int chunkZ = j * CHUNK_S * Voxel.BLOCK_SIZE;
+        Chunk chunk = new Chunk(world, chunkX, chunkZ, CHUNK_S, CHUNK_H);
+        
         int maxDelta = 15;
         int headroom = 3;
-        Random rand = new Random();
-        SimplexNoise noiseGenHeight = new SimplexNoise(90, 0.40, rand.nextInt());
-        SimplexNoise noiseGenType = new SimplexNoise(45, .1, rand.nextInt());
         
-        for (int x = 0; x < numBlocksXZ; x++) {
-            for (int z = 0; z < numBlocksXZ; z++) {
-                double noise = noiseGenHeight.getNoise(x, z);
+        VoxelType[][][] blocks = new VoxelType[CHUNK_S][CHUNK_H][CHUNK_S];
+        
+        for (int x = 0; x < CHUNK_S; x++) {
+            for (int z = 0; z < CHUNK_S; z++) {
+                int noiseX = x + i * CHUNK_S;
+                int noiseZ = z + j * CHUNK_S;
+                
+                double noise = noiseGenHeight.getNoise(noiseX, noiseZ);
                 int heightDelta =(int) (maxDelta * noise + maxDelta) - 1;
                 if (heightDelta > maxDelta) {
                     heightDelta = maxDelta;
                 }
                 
-                int maxHeight = numBlocksY - heightDelta - headroom;
+                int maxHeight = CHUNK_H - heightDelta - headroom;
                 for (int y = 0; y < maxHeight; y++) {
                     Voxel.VoxelType type = Voxel.VoxelType.BEDROCK;
                     
                     if (y < maxHeight - 1) {
-                        if (y >= 1 && y < numBlocksY / 2) {
+                        if (y >= 1 && y < CHUNK_H / 2) {
                             type = Voxel.VoxelType.STONE;
                             if (rand.nextDouble() < 0.001) {
                                 if (y < 6)
@@ -47,11 +127,11 @@ public class WorldGenerator {
                                     generateOreVein(blocks, x, y, z, Voxel.VoxelType.COAL);
                             }
                             
-                        } else if (y >= numBlocksY / 2) {
+                        } else if (y >= CHUNK_H / 2) {
                             type = Voxel.VoxelType.DIRT;
                         }
                     } else {
-                        float v = (float) (noiseGenType.getNoise(x, y, z) + 1) / 2;
+                        float v = (float) (noiseGenType.getNoise(noiseX, y, noiseZ) + 1) / 2;
                         if (heightDelta == maxDelta) {
                             if (v > 0.5) {
                                 type = Voxel.VoxelType.WATER;
@@ -84,9 +164,12 @@ public class WorldGenerator {
                 }
             }
         }
+        
+        chunk.copyBlocks(blocks, 0, CHUNK_S, 0, CHUNK_H, 0, CHUNK_S);
+        return chunk;
     }
     
-    private static void generateOreVein(VoxelType[][][] blocks, int x, int y, int z, VoxelType v) {
+    private void generateOreVein(VoxelType[][][] blocks, int x, int y, int z, VoxelType v) {
         Random rand = new Random();
         
         int max = 8;
@@ -133,7 +216,7 @@ public class WorldGenerator {
     * purpose: Add a simple tree to the blocks array at a given x,y,z. Uses the
     * addBlocks method (which includes bounds checking) to place the blocks.
     **/
-    private static void generateTree(VoxelType[][][] blocks, int x, int y, int z) {
+    private void generateTree(VoxelType[][][] blocks, int x, int y, int z) {
         int[] trunkCoords = new int[] {
             x, y++, z,
             x, y++, z,
@@ -175,7 +258,7 @@ public class WorldGenerator {
     * purpose: Add blocks of a given type to all the x,y,z positions in the
     * input float array. (x,y,z refer to indices of the blocks array)
     **/
-    private static void addBlocksSafe(VoxelType[][][] blocks, int[] blockCoords, VoxelType type) {
+    private void addBlocksSafe(VoxelType[][][] blocks, int[] blockCoords, VoxelType type) {
         for (int i = 0; i < blockCoords.length - 2; i+= 3) {
             int xx = blockCoords[i + 0];
             int yy = blockCoords[i + 1];

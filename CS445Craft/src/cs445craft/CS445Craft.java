@@ -13,12 +13,16 @@
 ****************************************************************/
 package cs445craft;
 
+import java.io.File;
+import java.io.FileInputStream;
 import java.io.IOException;
+import java.util.Random;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 import org.lwjgl.LWJGLException;
 import org.lwjgl.input.Keyboard;
 import org.lwjgl.input.Mouse;
+import org.newdawn.slick.opengl.TextureLoader;
 
 public class CS445Craft {
     private static World w;
@@ -28,7 +32,7 @@ public class CS445Craft {
     * purpose: The main event loop of the game. Collects user input, moves camera,
     * and checks for collision. It requires a Screen and Camera object.
     **/
-    private static void run(Screen screen, Camera camera) {
+    private static void run(Screen screen, Camera camera, WorldGenerator wg) {
         Mouse.setGrabbed(true);
         
         boolean noClip = false;
@@ -98,29 +102,34 @@ public class CS445Craft {
                 lastMouseState = false;
             }
             
-            boolean updated = false;
+            boolean gridPositionUpdated = false;
+            boolean chunkPositionUpdated = false;
             if (w.worldPosToBlockIndex(camera.x) != indexx) {
-                updated = true;
+                gridPositionUpdated = true;
                 indexx = w.worldPosToBlockIndex(camera.x);
             }
             
             if (w.worldPosToBlockIndex(camera.z) != indexz) {
-                updated = true;
+                gridPositionUpdated = true;
                 indexz = w.worldPosToBlockIndex(camera.z);
             }
             
             if (w.blockIndexToChunkNum(indexx) != chunki) {
-                updated = true;
+                chunkPositionUpdated = true;
                 chunki = w.blockIndexToChunkNum(indexx);
             }
             
             if (w.blockIndexToChunkNum(indexz) != chunkj) {
-                updated = true;
+                chunkPositionUpdated = true;
                 chunkj = w.blockIndexToChunkNum(indexz);
             }
             
-            if (updated) {
-                System.out.println("New pos (" + indexx + "," + indexz + ") chunk (" + chunki + "," + chunkj + ")");
+            if (gridPositionUpdated || chunkPositionUpdated) {
+                System.out.println("pos (" + indexx + "," + indexz + ") chunk (" + chunki + "," + chunkj + ")");
+            }
+            
+            if (chunkPositionUpdated) {
+                screen.addObjects(wg.newChunkPosition(chunki, chunkj));
             }
             
             if (Keyboard.isKeyDown(Keyboard.KEY_V)) {
@@ -283,9 +292,15 @@ public class CS445Craft {
             //s = new Screen(1024, 768, "CS445Craft", c);
             s = new Screen(1024, 768, "CS445Craft", c);
             
+            // load texture
+            TextureLoader.getTexture("png", new FileInputStream(new File("res/terrain.png")));
+            
             int worldSize = 5;
             
-            w = new World(worldSize);
+            Random rand = new Random();
+            WorldGenerator wg = new WorldGenerator(rand.nextInt());
+            
+            w = wg.getOrGenerate();
             s.addObjects(w.getChunks());
             
             float center = w.getWidth() / 2;
@@ -293,7 +308,7 @@ public class CS445Craft {
             c.z = center;
             c.y = World.CHUNK_H * Voxel.BLOCK_SIZE;
             
-            run(s, c);
+            run(s, c, wg);
         } catch (LWJGLException ex) {
             Logger.getLogger(CS445Craft.class.getName()).log(Level.SEVERE, null, ex);
         } catch (IOException ex) {

@@ -9,8 +9,10 @@ import cs445craft.Voxel.VoxelType;
 import java.io.IOException;
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 
 public class World {
     public static final int CHUNK_S = 30; // 30 x 30 x 30 chunk
@@ -18,47 +20,22 @@ public class World {
     
     public static final int NUM_BLOCKS = CHUNK_S * CHUNK_S * CHUNK_H;
     
-    private int size;    
+    private int size;
+    private List<Chunk> chunksList;
     private Map<Integer, Map<Integer, Chunk>> chunks;
     private Map<Chunk, Integer> chunkToIndexI;
     private Map<Chunk, Integer> chunkToIndexJ;
     
-    public World(int size) throws IOException {
+    public World(int size) {
         this.size = size;
-        chunks = new HashMap<>();
-        for (int i = 0; i < size; i++) {
-            chunks.put(i, new HashMap<>());
-        }
-        
-        // generate a large random world
-        VoxelType[][][] world = new VoxelType[size * CHUNK_S][CHUNK_H][size * CHUNK_S];
-                
-        WorldGenerator.generateRandomWorld(world, size * CHUNK_S, CHUNK_H);
-        
+        chunksList = new ArrayList<>();
+        chunks = new HashMap<>();        
         chunkToIndexI = new HashMap<>();
         chunkToIndexJ = new HashMap<>();
-        
-        // split work into CHUNK_S sized chunks
-        for (int i = 0; i < size; i++) {
-            for (int j = 0; j < size; j++) {
-                float offsetX = CHUNK_S * i;
-                float offsetZ = CHUNK_S * j;
-                
-                Chunk c = new Chunk(this, offsetX * Voxel.BLOCK_SIZE, offsetZ * Voxel.BLOCK_SIZE, CHUNK_S, CHUNK_H);
-                c.copyBlocks(world, i * CHUNK_S, CHUNK_S, 0, CHUNK_H, j * CHUNK_S, CHUNK_S);
-                addChunk(i, j, c);                
-            }
-        }
-        
-        // build all the meshes
-        for (int i = 0; i < size; i++) {
-            for (int j = 0; j < size; j++) {
-                getChunk(i, j).rebuildMesh();
-            }
-        }
     }
     
-    private void addChunk(int i, int j, Chunk c) {
+    public void addChunk(int i, int j, Chunk c) {
+        chunksList.add(c);
         if (chunks.get(i) == null) {
             chunks.put(i, new HashMap<>());
         }
@@ -67,7 +44,7 @@ public class World {
         chunkToIndexJ.put(c, j);
     }
     
-    private Chunk getChunk(int i, int j) {
+    public Chunk getChunk(int i, int j) {
         if (chunks.get(i) == null) {
             return null;
         }
@@ -94,11 +71,24 @@ public class World {
         return getChunk(i, j);
     }
     
-    public List<Chunk> getChunks() {
-        List<Chunk> chunksList = new ArrayList<>();
-        for (Map<Integer, Chunk> map : chunks.values()) {
-            chunksList.addAll(map.values());
+    public Set<Chunk> findAdjacent(Chunk c) {
+        Set<Chunk> adjacent = new HashSet<>();
+        Integer i = chunkToIndexI.get(c);
+        Integer j = chunkToIndexJ.get(c);
+        if (i == null || j == null) {
+            return adjacent;
         }
+        
+        adjacent.add(getChunk(i - 1, j));
+        adjacent.add(getChunk(i + 1, j));
+        adjacent.add(getChunk(i, j - 1));
+        adjacent.add(getChunk(i, j + 1));
+        adjacent.remove(null);
+        
+        return adjacent;
+    }
+    
+    public List<Chunk> getChunks() {
         return chunksList;
     }
     
@@ -115,6 +105,12 @@ public class World {
     }
     
     public int blockIndexToChunkNum(int index) {
+        if (index < 0) {
+            float idx = (float) index;
+            float div = idx / CHUNK_S;
+            int ceil = -(int) Math.ceil(-div);
+            return ceil;
+        }
         return index / CHUNK_S;
     }
     
@@ -132,7 +128,7 @@ public class World {
 
         Chunk c = getChunk(i, j);
         if (c != null) {
-            return c.blockAt(xIndex % CHUNK_S, yIndex, zIndex % CHUNK_S);
+            return c.blockAt(Math.floorMod(xIndex, CHUNK_S), yIndex, Math.floorMod(zIndex, CHUNK_S));
         }
         
         return null;
@@ -148,7 +144,7 @@ public class World {
         
         Chunk c = getChunk(i, j);
         if (c != null) {
-            return c.solidBlockAt(xIndex % CHUNK_S, yIndex, zIndex % CHUNK_S);
+            return c.solidBlockAt(Math.floorMod(xIndex, CHUNK_S), yIndex, Math.floorMod(zIndex, CHUNK_S));
         }
         
         return null;
@@ -164,7 +160,7 @@ public class World {
         
         Chunk c = getChunk(i, j);
         if (c != null) {
-            return blockIndexToWorldPos(c.depthAt(xIndex % CHUNK_S, yIndex, zIndex % CHUNK_S));
+            return blockIndexToWorldPos(c.depthAt(Math.floorMod(xIndex, CHUNK_S), yIndex, Math.floorMod(zIndex, CHUNK_S)));
         }
         
         return 0.0f;
@@ -180,7 +176,7 @@ public class World {
         
         Chunk c = getChunk(i, j);
         if (c != null) {
-            c.removeBlock(xIndex % CHUNK_S, yIndex, zIndex % CHUNK_S);
+            c.removeBlock(Math.floorMod(xIndex, CHUNK_S), yIndex, Math.floorMod(zIndex, CHUNK_S));
         }
     }
     

@@ -23,8 +23,6 @@ import java.nio.FloatBuffer;
 import org.lwjgl.BufferUtils;
 import static org.lwjgl.opengl.GL11.*;
 import static org.lwjgl.opengl.GL15.*;
-import org.newdawn.slick.opengl.Texture;
-import org.newdawn.slick.opengl.TextureLoader;
 
 public class Chunk extends Drawable {
     private World world;
@@ -38,13 +36,12 @@ public class Chunk extends Drawable {
     private int numVisibleFaces;
     private int numVisibleFacesTranslucent;
     
-    private Texture texture;
     private int VBOVertexHandle;
     private int VBOTextureHandle;
     private int VBOVertexHandleTranslucent;
     private int VBOTextureHandleTranslucent;
     
-    public Chunk(World world, float chunkX, float chunkZ, int chunkSize, int chunkHeight) throws IOException {
+    public Chunk(World world, float chunkX, float chunkZ, int chunkSize, int chunkHeight) {
         this.world = world;
         this.chunkX = chunkX;
         this.chunkY = 0.0f;
@@ -55,7 +52,6 @@ public class Chunk extends Drawable {
         excludeHidden = true;
         
         blocks = new VoxelType[chunkSize][chunkHeight][chunkSize];
-        texture = TextureLoader.getTexture("png", new FileInputStream(new File("res/terrain.png")));
     }
     
     public void copyBlocks(VoxelType[][][] wBlocks, int sx, int lx, int sy, int ly, int sz, int lz) {

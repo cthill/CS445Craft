@@ -16,6 +16,7 @@ package cs445craft;
 
 import java.awt.Font;
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.Comparator;
 import java.util.List;
 import org.lwjgl.LWJGLException;
@@ -26,7 +27,9 @@ import org.lwjgl.util.glu.GLU;
 import org.newdawn.slick.TrueTypeFont;
 
 public class Screen {
+    private static final int DRAW_DIST = World.CHUNK_S * Voxel.BLOCK_SIZE * 3;
     private int width, height;
+    private float r, g, b;
     private String title;
     private Camera camera;
     private List<Drawable> objects;
@@ -39,6 +42,9 @@ public class Screen {
         this.title = title;
         this.camera = camera;
         objects = new ArrayList<>();
+        r = 1.0f;
+        g = 1.0f;
+        b = 1.0f;
         
         // create window
         Display.setFullscreen(false);
@@ -67,6 +73,16 @@ public class Screen {
         objects.add(object);
     }
     
+    public void addObjects(Collection< ? extends Drawable> coll) {
+        objects.addAll(coll);
+    }
+    
+    public void setTintColor(float r, float g, float b) {
+        this.r = r;
+        this.g = g;
+        this.b = b;
+    }
+    
     /**
     * method: drawFrame
     * purpose: Draw one frame by looping through the list of Drawable objects
@@ -85,7 +101,7 @@ public class Screen {
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);
         
         // 3d draw prepare
-        glColor3f(1.0f,1.0f,1.0f);
+        glColor3f(r, g, b);
         glLoadIdentity();
         glPushMatrix();
         camera.lookThrough();
@@ -93,9 +109,11 @@ public class Screen {
         // 3d draw solid objects
         glEnable(GL_ALPHA_TEST);
         // sort opaque objects front to back
-        objects.sort(Comparator.comparing(object -> object.distanceTo(camera.x, camera.y, camera.z)));
+        objects.sort(Comparator.comparing(object -> ((Drawable) object).distanceTo(camera.x, camera.y, camera.z)).reversed());
         for (Drawable object: objects) {
-            object.draw();
+            if (object.distanceTo(camera.x, object.getY(), camera.z) <= DRAW_DIST) {
+                object.draw();
+            }
         }
         glDisable(GL_ALPHA_TEST);
         
@@ -104,14 +122,17 @@ public class Screen {
         glDisable(GL_CULL_FACE);
         glDepthMask(false);
         // sort translucent objects back to front
-        objects.sort(Comparator.comparing(object -> ((Drawable) object).distanceTo(camera.x, camera.y, camera.z)).reversed());
+        objects.sort(Comparator.comparing(object -> object.distanceTo(camera.x, camera.y, camera.z)));
         for (Drawable object: objects) {
-            object.drawTranslucent();
+            if (object.distanceTo(camera.x, object.getY(), camera.z) <= DRAW_DIST) {
+                object.drawTranslucent();
+            }
         }
         glDepthMask(true);
         
         // 3d draw finish
         glPopMatrix();
+        glColor3f(1.0f,1.0f,1.0f);
         
         // switch to 2d mode for hud draw
         glMatrixMode(GL_PROJECTION);

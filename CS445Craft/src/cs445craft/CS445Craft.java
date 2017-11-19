@@ -13,33 +13,26 @@
 ****************************************************************/
 package cs445craft;
 
+import java.io.File;
+import java.io.FileInputStream;
 import java.io.IOException;
+import java.util.Random;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 import org.lwjgl.LWJGLException;
 import org.lwjgl.input.Keyboard;
 import org.lwjgl.input.Mouse;
+import org.newdawn.slick.opengl.TextureLoader;
 
 public class CS445Craft {
     private static World w;
-    
-    /**
-    * method: coordsToChunk
-    * purpose: return the chunk a pair of xy coordinates occupies. In the future,
-    * this method will support mulitple chunks.
-    **/
-    private static Chunk coordsToChunk(float x, float z) {
-        // TODO: allow for more chunks
-        return w.coordsToChunk(x, z);
-    }
     
     /**
     * method: run
     * purpose: The main event loop of the game. Collects user input, moves camera,
     * and checks for collision. It requires a Screen and Camera object.
     **/
-    private static void run(Screen screen, Camera camera) {
-        Mouse.setCursorPosition(0,0);
+    private static void run(Screen screen, Camera camera, WorldGenerator wg) {
         Mouse.setGrabbed(true);
         
         boolean noClip = false;
@@ -47,12 +40,12 @@ public class CS445Craft {
         float mouseSens = 0.09f;
         float speed = .20f;
         float gravity = 0.025f;
-        float terminalVelocity = speed * 5;
+        float terminalVelocity = -speed * 5;
         float jumpSpeed = 0.40f;
         float yspeed = 0.0f;
         
         // player is 1.5 blocks tall, so yOffset = Chunk.CUBE_S * 1.5;
-        float playerHeight = Chunk.BLOCK_SIZE * 1.5f;
+        float playerHeight = Voxel.BLOCK_SIZE * 1.5f;
         float sideCollideHeightFactor = 0.75f;
         boolean lastSpaceState = false; // last state of the spacebar (true == pressed)
         boolean lastVState = false;
@@ -65,6 +58,8 @@ public class CS445Craft {
         int indexz = 0;
         
         while(true) {
+            Mouse.setCursorPosition(0,0);
+            
             // listen for q key
             if (Keyboard.isKeyDown(Keyboard.KEY_ESCAPE) || Keyboard.isKeyDown(Keyboard.KEY_Q)) {
                 screen.close();
@@ -79,14 +74,26 @@ public class CS445Craft {
             if (Mouse.isButtonDown(0)) {
                 if (!lastMouseState) {
                     lastMouseState = true;
-                    for (int amplitude = 1; amplitude <= Chunk.BLOCK_SIZE * 2; amplitude++) {
-                        float clickX = camera.x - (float) (amplitude * Math.sin(Math.toRadians(camera.yaw)) * Math.cos(Math.toRadians(camera.pitch)));
-                        float clickZ = camera.z + (float) (amplitude * Math.cos(Math.toRadians(camera.yaw)) * Math.cos(Math.toRadians(camera.pitch)));
+                    
+                    float clickX = (float) (Math.sin(Math.toRadians(camera.yaw)) * Math.cos(Math.toRadians(-camera.pitch)));
+                    float clickZ = (float) (Math.cos(Math.toRadians(camera.yaw)) * Math.cos(Math.toRadians(-camera.pitch)));
+                    float clickY = (float)  Math.sin(Math.toRadians(-camera.pitch));
+                    
+                    for (float amplitude = 0.5f; amplitude <= Voxel.BLOCK_SIZE * 2; amplitude++) {
+                        float projectX = camera.x + amplitude * clickX;
+                        float projectZ = camera.z - amplitude * clickZ;
+                        float projectY = camera.y + amplitude * clickY;
                         
-                        float clickY = camera.y + (float) (amplitude * Math.sin(Math.toRadians(camera.pitch)));
+                        Voxel.VoxelType clickedBlock = w.blockAt(projectX, projectY, projectZ);
+                        if (clickedBlock == null || Voxel.isMineThrough(clickedBlock)) {
+                            continue;
+                        }
                         
-                        if (w.blockAt(clickX, clickY, clickZ)) {
-                            w.removeBlock(clickX, clickY, clickZ);
+                        // check if block can be broken
+                        if (Voxel.isBreakable(clickedBlock)) {
+                            w.removeBlock(projectX, projectY, projectZ);
+                            break;
+                        } else {
                             break;
                         }
                     } 
@@ -95,29 +102,34 @@ public class CS445Craft {
                 lastMouseState = false;
             }
             
-            boolean updated = false;
+            boolean gridPositionUpdated = false;
+            boolean chunkPositionUpdated = false;
             if (w.worldPosToBlockIndex(camera.x) != indexx) {
-                updated = true;
+                gridPositionUpdated = true;
                 indexx = w.worldPosToBlockIndex(camera.x);
             }
             
             if (w.worldPosToBlockIndex(camera.z) != indexz) {
-                updated = true;
+                gridPositionUpdated = true;
                 indexz = w.worldPosToBlockIndex(camera.z);
             }
             
             if (w.blockIndexToChunkNum(indexx) != chunki) {
-                updated = true;
+                chunkPositionUpdated = true;
                 chunki = w.blockIndexToChunkNum(indexx);
             }
             
             if (w.blockIndexToChunkNum(indexz) != chunkj) {
-                updated = true;
+                chunkPositionUpdated = true;
                 chunkj = w.blockIndexToChunkNum(indexz);
             }
             
-            if (updated) {
-                System.out.println("New pos (" + indexx + "," + indexz + ") chunk (" + chunki + "," + chunkj + ")");
+            if (gridPositionUpdated || chunkPositionUpdated) {
+                System.out.println("pos (" + indexx + "," + indexz + ") chunk (" + chunki + "," + chunkj + ")");
+            }
+            
+            if (chunkPositionUpdated) {
+                screen.addObjects(wg.newChunkPosition(chunki, chunkj));
             }
             
             if (Keyboard.isKeyDown(Keyboard.KEY_V)) {
@@ -151,32 +163,31 @@ public class CS445Craft {
    
             // gravity and jumping
             // listen for jump
-            boolean blockBelow = w.solidBlockAt(camera.x, camera.y + dy + playerHeight, camera.z);
-            boolean blockAbove = w.solidBlockAt(camera.x, camera.y + dy - 0.5f, camera.z);
+            boolean blockBelow = w.solidBlockAt(camera.x, camera.y + dy - playerHeight, camera.z) != null;
+            boolean blockAbove = w.solidBlockAt(camera.x, camera.y + dy + 0.5f, camera.z) != null;
             
             if (noClip) {
                 // skip gravity code if noclip is enabled
                 if (Keyboard.isKeyDown(Keyboard.KEY_SPACE))
-                    camera.y -= speed;
-                if (Keyboard.isKeyDown(Keyboard.KEY_LSHIFT))
                     camera.y += speed;
+                if (Keyboard.isKeyDown(Keyboard.KEY_LSHIFT))
+                    camera.y -= speed;
                 dy = 0;
                 yspeed = 0;
             }  else if (blockBelow) {
                 yspeed = 0;
                 dy = 0;
                 // prevent player from getting stuck in floor if they have high y speed
-                float depth = w.depthAt(camera.x, camera.y, camera.z);
-                camera.y = World.CHUNK_H * Chunk.BLOCK_SIZE - depth * Chunk.BLOCK_SIZE - playerHeight - .75f;
+                camera.y = w.depthAt(camera.x, camera.y, camera.z) + playerHeight + 0.75f;
                 //camera.y = Math.round(camera.y - 0.5f);
             } else {
-                if (blockAbove && yspeed < 0) {
+                if (blockAbove && yspeed > 0) {
                     yspeed = 0;
                 }
                 
                 // accelerate on the yaxis for the next frame
-                yspeed += gravity;
-                if (yspeed > terminalVelocity) {
+                yspeed -= gravity;
+                if (yspeed < terminalVelocity) {
                     yspeed = terminalVelocity;
                 }
             }
@@ -184,34 +195,33 @@ public class CS445Craft {
             if (Keyboard.isKeyDown(Keyboard.KEY_SPACE) && blockBelow && !noClip) {
                 if (!lastSpaceState) {
                     lastSpaceState = true;
-                    yspeed = -jumpSpeed;
+                    yspeed = jumpSpeed;
                 }
             } else {
                 lastSpaceState = false;
             }
-            
 
             // world movement
             // listen for movement keys
             if (Keyboard.isKeyDown(Keyboard.KEY_W)) {
-                dx += -speed * (float) Math.sin(Math.toRadians(camera.yaw));
-                dz += speed * (float) Math.cos(Math.toRadians(camera.yaw));
-            } else if (Keyboard.isKeyDown(Keyboard.KEY_S)) {
                 dx += speed * (float) Math.sin(Math.toRadians(camera.yaw));
                 dz += -speed * (float) Math.cos(Math.toRadians(camera.yaw));
+            } else if (Keyboard.isKeyDown(Keyboard.KEY_S)) {
+                dx += -speed * (float) Math.sin(Math.toRadians(camera.yaw));
+                dz += speed * (float) Math.cos(Math.toRadians(camera.yaw));
             }
             
             if (Keyboard.isKeyDown(Keyboard.KEY_A)) {
-                dx += -speed * (float)Math.sin(Math.toRadians(camera.yaw-90));
-                dz += speed * (float)Math.cos(Math.toRadians(camera.yaw-90));
-            } else if (Keyboard.isKeyDown(Keyboard.KEY_D)) {
                 dx += speed * (float)Math.sin(Math.toRadians(camera.yaw-90));
                 dz += -speed * (float)Math.cos(Math.toRadians(camera.yaw-90));
+            } else if (Keyboard.isKeyDown(Keyboard.KEY_D)) {
+                dx += -speed * (float)Math.sin(Math.toRadians(camera.yaw-90));
+                dz += speed * (float)Math.cos(Math.toRadians(camera.yaw-90));
             }
             
             float offsetX, offsetZ, offsetXZ;
             offsetX = offsetZ = 0.0f;
-            offsetXZ = Chunk.BLOCK_SIZE / 3.75f;
+            offsetXZ = Voxel.BLOCK_SIZE / 3.75f;
             
             if (dx > 0) {
                 offsetX = offsetXZ;
@@ -227,14 +237,14 @@ public class CS445Craft {
 
             // player is ~2 blocks tall, so we must check side collision twice on each axis
             float offsetY = playerHeight * sideCollideHeightFactor;
-            boolean willCollideX = w.solidBlockAt(camera.x + dx + offsetX, camera.y + offsetY, camera.z);
-                   willCollideX |= w.solidBlockAt(camera.x + dx + offsetX, camera.y + offsetY - Chunk.BLOCK_SIZE, camera.z);
-            boolean willCollideZ = w.solidBlockAt(camera.x, camera.y + offsetY, camera.z + dz + offsetZ);
-                   willCollideZ |= w.solidBlockAt(camera.x, camera.y + offsetY - Chunk.BLOCK_SIZE, camera.z + dz + offsetZ);
+            boolean willCollideX = w.solidBlockAt(camera.x + dx + offsetX, camera.y - offsetY, camera.z) != null;
+                   willCollideX |= w.solidBlockAt(camera.x + dx + offsetX, camera.y - offsetY + Voxel.BLOCK_SIZE, camera.z) != null;
+            boolean willCollideZ = w.solidBlockAt(camera.x, camera.y - offsetY, camera.z + dz + offsetZ) != null;
+                   willCollideZ |= w.solidBlockAt(camera.x, camera.y - offsetY + Voxel.BLOCK_SIZE, camera.z + dz + offsetZ) != null;
                    
             // special case for when running directly into a corner
-            boolean willCollideXZ = w.solidBlockAt(camera.x + dx + offsetX, camera.y + offsetY, camera.z + dz + offsetZ);
-                   willCollideXZ |= w.solidBlockAt(camera.x + dx + offsetX, camera.y + offsetY - Chunk.BLOCK_SIZE, camera.z + dz + offsetZ);
+            boolean willCollideXZ = w.solidBlockAt(camera.x + dx + offsetX, camera.y - offsetY, camera.z + dz + offsetZ) != null;
+                   willCollideXZ |= w.solidBlockAt(camera.x + dx + offsetX, camera.y - offsetY + Voxel.BLOCK_SIZE, camera.z + dz + offsetZ) != null;
                    
             if (willCollideXZ && !willCollideX && !willCollideZ && !noClip) {
                 dx = 0;
@@ -252,6 +262,14 @@ public class CS445Craft {
             camera.x += dx;
             camera.z += dz;
             camera.y += dy;
+            
+            // check if underwater
+            Voxel.VoxelType blockAtCamera = w.blockAt(camera.x, camera.y, camera.z);
+            if (blockAtCamera == Voxel.VoxelType.WATER) {
+                screen.setTintColor(0.75f, 0.75f, 1.0f);
+            } else {
+                screen.setTintColor(1.0f, 1.0f, 1.0f);
+            }
             
             // look movement
             camera.incYaw(Mouse.getDX() * mouseSens);
@@ -274,21 +292,23 @@ public class CS445Craft {
             //s = new Screen(1024, 768, "CS445Craft", c);
             s = new Screen(1024, 768, "CS445Craft", c);
             
+            // load texture
+            TextureLoader.getTexture("png", new FileInputStream(new File("res/terrain.png")));
+            
             int worldSize = 5;
             
-            w = new World(worldSize);
-            Chunk[][] chunks = w.getChunks();
-            for (int i = 0; i < worldSize; i++) {
-                for (int j = 0; j < worldSize; j++) {
-                    s.addObject(chunks[i][j]);
-                }
-            }
+            Random rand = new Random();
+            WorldGenerator wg = new WorldGenerator(rand.nextInt());
             
-            float center = w.getWorldSize() / 2;
-            c.x = -center;
-            c.z = -center;
+            w = wg.getOrGenerate();
+            s.addObjects(w.getChunks());
             
-            run(s, c);
+            float center = w.getWidth() / 2;
+            c.x = center;
+            c.z = center;
+            c.y = World.CHUNK_H * Voxel.BLOCK_SIZE;
+            
+            run(s, c, wg);
         } catch (LWJGLException ex) {
             Logger.getLogger(CS445Craft.class.getName()).log(Level.SEVERE, null, ex);
         } catch (IOException ex) {

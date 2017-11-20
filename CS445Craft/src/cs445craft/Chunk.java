@@ -236,8 +236,8 @@ public class Chunk extends Drawable {
         float[] positionDataTranslucent = new float[NUM_BLOCKS * 6 * floatsPerFacePosition];
         float[] textureDataTranslucent = new float[NUM_BLOCKS * 6 * floatsPerFaceTexture];
 
-        int totalFaces = 0;
-        int totalFacesTranslucent = 0;
+//        int totalFaces = 0;
+//        int totalFacesTranslucent = 0;
         
         for (int x = 0; x < CHUNK_S; x++) {
             for (int z = 0; z < CHUNK_S; z++) {
@@ -253,19 +253,9 @@ public class Chunk extends Drawable {
                     float blockY = (float) (y * Voxel.BLOCK_SIZE);
                     float blockZ = (float) (z * Voxel.BLOCK_SIZE);
                     
-                    if (Voxel.isCrossType(voxelType)) {
-                        createCross(positionData, writeIndexPosition, blockX, blockY, blockZ);
-                        writeIndexPosition += floatsPerFacePosition * 4;
-                        
-                        textureCross(textureData, writeIndexTexture, voxelType);
-                        writeIndexTexture += floatsPerFaceTexture * 4;
-                        
-                        totalFaces += 4;
-                        continue;
-                    }
-                    
                     // check if block is transparent
                     boolean translucentTexture = Voxel.isTranslucent(voxelType);
+                    boolean partiallyTransparent = Voxel.isPartiallyTransparent(voxelType);
 
                     boolean[] faceVisible = new boolean[] { true, true, true, true, true, true };
                     if (excludeHidden) {
@@ -276,15 +266,15 @@ public class Chunk extends Drawable {
                         VoxelType left = lookupTraverseChunks(x - 1, y, z);
                         VoxelType right = lookupTraverseChunks(x + 1, y, z);
                         
-                        
                         // compute faces that can not be seen
                         faceVisible = new boolean[] {
-                            above == null || (!translucentTexture && Voxel.isSeeTrough(above)),
-                            (below == null || (!translucentTexture && Voxel.isSeeTrough(below))) && y > 0,
-                            front == null || (!translucentTexture && Voxel.isSeeTrough(front)),
-                            back  == null || (!translucentTexture && Voxel.isSeeTrough(back)),
-                            left  == null || (!translucentTexture && Voxel.isSeeTrough(left)),
-                            right == null || (!translucentTexture && Voxel.isSeeTrough(right)) 
+                             above == null || (!translucentTexture && Voxel.isSeeTrough(above)) || partiallyTransparent,
+                            // the extra && y > 0 is here so we don't draw the bottom faces of the world's bottom voxels
+                            (below == null || (!translucentTexture && Voxel.isSeeTrough(below)) || partiallyTransparent) && y > 0,
+                             front == null || (!translucentTexture && Voxel.isSeeTrough(front)) || partiallyTransparent,
+                             back  == null || (!translucentTexture && Voxel.isSeeTrough(back))  || partiallyTransparent,
+                             left  == null || (!translucentTexture && Voxel.isSeeTrough(left))  || partiallyTransparent,
+                             right == null || (!translucentTexture && Voxel.isSeeTrough(right)) || partiallyTransparent 
                         };
                     }
                     
@@ -295,51 +285,39 @@ public class Chunk extends Drawable {
                             cubeFaces++;
                         }
                     }
-                    
-                    if (!translucentTexture) {
-                        totalFaces += cubeFaces;
-                    } else {
-                        totalFacesTranslucent += cubeFaces;
-                    }
-                    
+
                     if (cubeFaces == 0) {
                         continue;
                     }
                     
                     // write cube position vertex data and texture vertex data
                     if (!translucentTexture) {
-                        createCube(positionData, writeIndexPosition, faceVisible, blockX, blockY, blockZ);
-                        writeIndexPosition += cubeFaces * floatsPerFacePosition;
-                        
-                        textureCube(textureData, writeIndexTexture, faceVisible, voxelType);
-                        writeIndexTexture += cubeFaces * floatsPerFaceTexture;
+                        writeIndexPosition += Voxel.getVertices(positionData, writeIndexPosition, faceVisible, voxelType, blockX, blockY, blockZ);
+                        writeIndexTexture += Voxel.getTextureVertices(textureData, writeIndexTexture, faceVisible, voxelType);
                     } else {
-                        createCube(positionDataTranslucent, writeIndexPositionTranslucent, faceVisible, blockX, blockY, blockZ);
-                        writeIndexPositionTranslucent += cubeFaces * floatsPerFacePosition;
-
-                        textureCube(textureDataTranslucent, writeIndexTextureTranslucent, faceVisible, voxelType);
-                        writeIndexTextureTranslucent += cubeFaces * floatsPerFaceTexture;                        
+                        writeIndexPositionTranslucent += Voxel.getVertices(positionDataTranslucent, writeIndexPositionTranslucent, faceVisible, voxelType, blockX, blockY, blockZ);
+                        writeIndexTextureTranslucent += Voxel.getTextureVertices(textureDataTranslucent, writeIndexTextureTranslucent, faceVisible, voxelType);
                     }
                 }
             }
         }
-        numVisibleFaces = totalFaces;
-        numVisibleFacesTranslucent = totalFacesTranslucent;
+        numVisibleFaces = writeIndexPosition / floatsPerFacePosition;
+        numVisibleFacesTranslucent = writeIndexPositionTranslucent / floatsPerFaceTexture;
         
         VBOVertexHandle = glGenBuffers();
         VBOTextureHandle = glGenBuffers();
         VBOVertexHandleTranslucent = glGenBuffers();
         VBOTextureHandleTranslucent = glGenBuffers();
         
-        FloatBuffer VertexPosition = BufferUtils.createFloatBuffer(totalFaces * floatsPerFacePosition);
-        FloatBuffer VertexTexture = BufferUtils.createFloatBuffer(totalFaces * floatsPerFaceTexture);
-        FloatBuffer VertexPositionTranslucent = BufferUtils.createFloatBuffer(totalFacesTranslucent * floatsPerFacePosition);
-        FloatBuffer VertexTextureTranslucent = BufferUtils.createFloatBuffer(totalFacesTranslucent * floatsPerFaceTexture);
+        FloatBuffer VertexPosition = BufferUtils.createFloatBuffer(writeIndexPosition);
+        FloatBuffer VertexTexture = BufferUtils.createFloatBuffer(writeIndexTexture);
+        FloatBuffer VertexPositionTranslucent = BufferUtils.createFloatBuffer(writeIndexPositionTranslucent);
+        FloatBuffer VertexTextureTranslucent = BufferUtils.createFloatBuffer(writeIndexTextureTranslucent);
         
-        ((FloatBuffer) VertexPosition.clear()).put(positionData, 0, totalFaces * floatsPerFacePosition).flip();
-        ((FloatBuffer) VertexTexture.clear()).put(textureData, 0, totalFaces * floatsPerFaceTexture).flip();
-        ((FloatBuffer) VertexPositionTranslucent.clear()).put(positionDataTranslucent, 0, totalFacesTranslucent * floatsPerFacePosition).flip();
-        ((FloatBuffer) VertexTextureTranslucent.clear()).put(textureDataTranslucent, 0, totalFacesTranslucent * floatsPerFaceTexture).flip();
+        ((FloatBuffer) VertexPosition.clear()).put(positionData, 0, writeIndexPosition).flip();
+        ((FloatBuffer) VertexTexture.clear()).put(textureData, 0, writeIndexTexture).flip();
+        ((FloatBuffer) VertexPositionTranslucent.clear()).put(positionDataTranslucent, 0, writeIndexPositionTranslucent).flip();
+        ((FloatBuffer) VertexTextureTranslucent.clear()).put(textureDataTranslucent, 0, writeIndexTextureTranslucent).flip();
         
         glBindBuffer(GL_ARRAY_BUFFER, VBOVertexHandle);
         glBufferData(GL_ARRAY_BUFFER, VertexPosition, GL_STATIC_DRAW);
@@ -393,223 +371,4 @@ public class Chunk extends Drawable {
         // https://stackoverflow.com/questions/4412179/best-way-to-make-javas-modulus-behave-like-it-should-with-negative-numbers/25830153#25830153
         return adjacentChunk.safeLookup(Math.floorMod(x, CHUNK_S), y, Math.floorMod(z, CHUNK_S));
     }
-
-    
-    /**
-    * method: createCube()
-    * purpose: Return an array of float vertices that define a cube at position
-    * x,y,z.
-    **/
-    
-    private static void createCube(float[] buff, int startIndex, boolean[] faceVisible, float x, float y, float z) {
-        float s = ((float) Voxel.BLOCK_SIZE) / 2;
-        int floatsPerFace = 3 * 4;
-        
-        // TOP QUAD
-        if (faceVisible[0]) {
-            System.arraycopy(new float[] {
-                x + s, y + s, z + s,
-                x - s, y + s, z + s,
-                x - s, y + s, z - s,
-                x + s, y + s, z - s
-            }, 0, buff, startIndex, floatsPerFace);
-            startIndex += floatsPerFace;
-        }
-        
-        // BOTTOM QUAD
-        if (faceVisible[1]) {
-            System.arraycopy(new float[] {
-                x + s, y - s, z - s,
-                x - s, y - s, z - s,
-                x - s, y - s, z + s,
-                x + s, y - s, z + s
-            }, 0, buff, startIndex, floatsPerFace);
-            startIndex += floatsPerFace;
-        }
-        
-        // FRONT QUAD
-        if (faceVisible[2]) {
-            System.arraycopy(new float[] {
-                x + s, y + s, z - s,
-                x - s, y + s, z - s,
-                x - s, y - s, z - s,
-                x + s, y - s, z - s
-            }, 0, buff, startIndex, floatsPerFace);
-            startIndex += floatsPerFace;
-        }
-        
-        // BACK QUAD
-        if (faceVisible[3]) {
-            System.arraycopy(new float[] {
-                x + s, y - s, z + s,
-                x - s, y - s, z + s,
-                x - s, y + s, z + s,
-                x + s, y + s, z + s
-            }, 0, buff, startIndex, floatsPerFace);
-            startIndex += floatsPerFace;
-        }
-        
-        // LEFT QUAD
-        if (faceVisible[4]) {
-            System.arraycopy(new float[] {
-                x - s, y + s, z - s,
-                x - s, y + s, z + s,
-                x - s, y - s, z + s,
-                x - s, y - s, z - s
-            }, 0, buff, startIndex, floatsPerFace);
-            startIndex += floatsPerFace;
-        }
-        
-        // RIGHT QUAD
-        if (faceVisible[5]) {
-            System.arraycopy(new float[] {
-                x + s, y + s, z + s,
-                x + s, y + s, z - s,
-                x + s, y - s, z - s,
-                x + s, y - s, z + s
-            }, 0, buff, startIndex, floatsPerFace);
-            startIndex += floatsPerFace;
-        }
-    }
-    
-    /**
-    * method: getTexture()
-    * purpose: Return an array of float vertices that define the texture for
-    * a block of type v
-    **/
-    private void textureCube(float[] buff, int startIndex, boolean[] faceVisible, VoxelType v) {
-        float offset = (2048f/16)/2048f;
-        int floatsPerFace = 2 * 4;
-        int[] t = Voxel.getTexture(v);
-        
-        // top
-        if (faceVisible[0]) {
-            System.arraycopy(new float[] {
-                offset*(t[0] + 1), offset*(t[1] + 1),
-                offset*(t[0] + 0), offset*(t[1] + 1),
-                offset*(t[0] + 0), offset*(t[1] + 0),
-                offset*(t[0] + 1), offset*(t[1] + 0)
-            }, 0, buff, startIndex, floatsPerFace);
-            startIndex += floatsPerFace;
-        }
-        
-        // bottom
-        if (faceVisible[1]) {
-            System.arraycopy(new float[] {
-                offset*(t[2] + 1), offset*(t[3] + 1),
-                offset*(t[2] + 0), offset*(t[3] + 1),
-                offset*(t[2] + 0), offset*(t[3] + 0),
-                offset*(t[2] + 1), offset*(t[3] + 0)
-            }, 0, buff, startIndex, floatsPerFace);
-            startIndex += floatsPerFace;
-        }
-        
-        // front
-        if (faceVisible[2]) {
-            System.arraycopy(new float[] {
-                offset*(t[4] + 0), offset*(t[5] + 0),
-                offset*(t[4] + 1), offset*(t[5] + 0),
-                offset*(t[4] + 1), offset*(t[5] + 1),
-                offset*(t[4] + 0), offset*(t[5] + 1)
-            }, 0, buff, startIndex, floatsPerFace);
-            startIndex += floatsPerFace;
-        }
-        
-        // back
-        if (faceVisible[3]) {
-            System.arraycopy(new float[] {
-                offset*(t[6] + 1), offset*(t[7] + 1),
-                offset*(t[6] + 0), offset*(t[7] + 1),
-                offset*(t[6] + 0), offset*(t[7] + 0),
-                offset*(t[6] + 1), offset*(t[7] + 0)
-            }, 0, buff, startIndex, floatsPerFace);
-            startIndex += floatsPerFace;
-        }
-        
-        // left
-        if (faceVisible[4]) {
-            System.arraycopy(new float[] {
-                offset*(t[8] + 0), offset*(t[9] + 0),
-                offset*(t[8] + 1), offset*(t[9] + 0),
-                offset*(t[8] + 1), offset*(t[9] + 1),
-                offset*(t[8] + 0), offset*(t[9] + 1)
-            }, 0, buff, startIndex, floatsPerFace);
-            startIndex += floatsPerFace;
-        }
-        
-        // right
-        if (faceVisible[5]) {
-            System.arraycopy(new float[] {
-                offset*(t[10] + 0), offset*(t[11] + 0),
-                offset*(t[10] + 1), offset*(t[11] + 0),
-                offset*(t[10] + 1), offset*(t[11] + 1),
-                offset*(t[10] + 0), offset*(t[11] + 1)
-            }, 0, buff, startIndex, floatsPerFace);
-            startIndex += floatsPerFace;
-        }
-    }
-    
-    private static void createCross(float[] buff, int startIndex, float x, float y, float z) {
-        float s = ((float) Voxel.BLOCK_SIZE) / 2;
-        int floatsPerFace = 3 * 4;
-        
-        System.arraycopy(new float[] {
-            // FRONT QUAD
-            x + s, y + s, z,
-            x - s, y + s, z,
-            x - s, y - s, z,
-            x + s, y - s, z,
-        
-            // BACK QUAD
-            x + s, y - s, z,
-            x - s, y - s, z,
-            x - s, y + s, z,
-            x + s, y + s, z,
-        
-            // LEFT QUAD
-            x, y + s, z - s,
-            x, y + s, z + s,
-            x, y - s, z + s,
-            x, y - s, z - s,
-        
-            // RIGHT QUAD
-            x, y + s, z + s,
-            x, y + s, z - s,
-            x, y - s, z - s,
-            x, y - s, z + s
-        }, 0, buff, startIndex, floatsPerFace * 4);
-    }
-    
-    private void textureCross(float[] buff, int startIndex, VoxelType v) {
-        float offset = (2048f/16)/2048f;
-        int floatsPerFace = 2 * 4;
-        int[] t = Voxel.getTexture(v);
-        
-        
-        System.arraycopy(new float[] {
-            // front
-            offset*(t[4] + 0), offset*(t[5] + 0),
-            offset*(t[4] + 1), offset*(t[5] + 0),
-            offset*(t[4] + 1), offset*(t[5] + 1),
-            offset*(t[4] + 0), offset*(t[5] + 1),
-        
-            // back
-            offset*(t[6] + 1), offset*(t[7] + 1),
-            offset*(t[6] + 0), offset*(t[7] + 1),
-            offset*(t[6] + 0), offset*(t[7] + 0),
-            offset*(t[6] + 1), offset*(t[7] + 0),
-
-            // left
-            offset*(t[8] + 0), offset*(t[9] + 0),
-            offset*(t[8] + 1), offset*(t[9] + 0),
-            offset*(t[8] + 1), offset*(t[9] + 1),
-            offset*(t[8] + 0), offset*(t[9] + 1),
-
-            // right
-            offset*(t[10] + 0), offset*(t[11] + 0),
-            offset*(t[10] + 1), offset*(t[11] + 0),
-            offset*(t[10] + 1), offset*(t[11] + 1),
-            offset*(t[10] + 0), offset*(t[11] + 1)
-        }, 0, buff, startIndex, floatsPerFace * 4);
-    }       
 }

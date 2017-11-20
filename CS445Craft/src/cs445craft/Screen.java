@@ -28,7 +28,7 @@ import org.lwjgl.util.glu.GLU;
 import org.newdawn.slick.TrueTypeFont;
 
 public class Screen {
-    private static final float DRAW_DIST = Chunk.CHUNK_S * Voxel.BLOCK_SIZE * 3.5f;
+    private static float DRAW_DIST = Chunk.CHUNK_S * Voxel.BLOCK_SIZE * 4.5f;
     private final int width, height;
     private float r, g, b;
     private final String title;
@@ -87,12 +87,21 @@ public class Screen {
         this.b = b;
     }
     
+    public void incDrawDist(float d) {
+        DRAW_DIST += d;
+    }
+    
     /**
     * method: drawFrame
     * purpose: Draw one frame by looping through the list of Drawable objects
     * and rendering each one.
     **/
     public void drawFrame() {
+        render3D();
+        render2D();
+    }
+    
+    private void render3D() {
         // setup 3d config
         glEnable(GL_DEPTH_TEST);
         glEnable(GL_CULL_FACE);
@@ -137,7 +146,9 @@ public class Screen {
         // 3d draw finish
         glPopMatrix();
         glColor3f(1.0f,1.0f,1.0f);
-        
+    }
+    
+    private void render2D() {
         // switch to 2d mode for hud draw
         glMatrixMode(GL_PROJECTION);
         glLoadIdentity();

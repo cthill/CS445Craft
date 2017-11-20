@@ -16,18 +16,18 @@ public class Game {
     public static final int RES_HEIGHT = 768;
     
     // game constants
+    private static final int INITIAL_WORLD_SIZE = 5;
     private static final float MOUSE_SENS = 0.09f;
     private static final float MOVEMENT_SPEED = .20f;
     private static final float NOCLIP_SPEED = MOVEMENT_SPEED * 5;
     private static final float GRAVITY = 0.025f;
     private static final float TERMINAL_VELOCITY = MOVEMENT_SPEED * 5;
     private static final float JUMP_SPEED = 0.40f;
-    // player is 1.5 blocks tall, so yOffset = Chunk.CUBE_S * 1.5;
     private static final float PLAYER_HEIGHT = Voxel.BLOCK_SIZE * 1.5f;
     private static final float SIDE_COLLIDE_HEIGHT_FACTOR = 0.75f;
         
     // game variables
-    private boolean noClip, lastSpaceState, lastVState, lastRState, lastLeftMouseState;
+    private boolean noClip, lastSpaceState, lastVState, lastRState, lastLeftMouseState, lastUpState, lastDownState;
     private int worldX, worldZ, chunkI, chunkJ;
     private float yspeed;
     
@@ -39,11 +39,8 @@ public class Game {
     private final Screen screen;
     
     public Game() throws LWJGLException, IOException {        
-        rand = new Random();
-        int initialWorldSize = 3;
-        
         // init camera and screen
-        float center = initialWorldSize * Chunk.CHUNK_S * Voxel.BLOCK_SIZE / 2;
+        float center = INITIAL_WORLD_SIZE * Chunk.CHUNK_S * Voxel.BLOCK_SIZE / 2;
         float top = Chunk.CHUNK_H * Voxel.BLOCK_SIZE;
         camera = new Camera(center, top, center);
         screen = new Screen(RES_WIDTH, RES_HEIGHT, "CS445Craft", camera);
@@ -52,7 +49,8 @@ public class Game {
         TextureLoader.getTexture("png", new FileInputStream(new File("res/terrain.png")));
         
         // setup world and taskQueue
-        worldGen = new WorldGenerator(rand.nextInt(), initialWorldSize);
+        rand = new Random();
+        worldGen = new WorldGenerator(rand.nextInt(), INITIAL_WORLD_SIZE);
         world = worldGen.getOrGenerate();
         taskQueue = new TaskQueue();
         
@@ -66,13 +64,12 @@ public class Game {
     }
     
     private void init() {
+        Mouse.setGrabbed(true);
         chunkI = -1;
         chunkJ = -1;
     }
     
     public void run() {
-        Mouse.setGrabbed(true);
-        
         while(true) {
             // listen for q key or closeRequested
             if (Keyboard.isKeyDown(Keyboard.KEY_ESCAPE) || Keyboard.isKeyDown(Keyboard.KEY_Q)) {
@@ -83,25 +80,13 @@ public class Game {
                 break;
             }
             
-            // move mouse to center
-            Mouse.setCursorPosition(0,0);
-            
-            // update world position
             updateWorldPos();
-            
-            // handle mouse events (mouse movement & clicks)
             mouseEvents();
-            
-            // handle all keyboard events
             keyboardEvents();
-
-            
-            // check if underwater
             checkPlayerStatus();
-
-            // run one async task
-            taskQueue.run(1);
             
+            // run one async task
+            taskQueue.run(1);            
             // draw frame
             screen.drawFrame();
         }
@@ -141,6 +126,8 @@ public class Game {
     }
     
     private void mouseEvents() {
+        Mouse.setCursorPosition(0,0);
+        
         // look movement
         camera.incYaw(Mouse.getDX() * MOUSE_SENS);
         camera.incPitch(Mouse.getDY() * MOUSE_SENS);
@@ -195,6 +182,24 @@ public class Game {
             }
         } else {
             lastRState = false;
+        }
+        
+        if (Keyboard.isKeyDown(Keyboard.KEY_UP)) {
+            if (!lastUpState) {
+                lastUpState = true;
+                screen.incDrawDist(Chunk.CHUNK_S * Voxel.BLOCK_SIZE);
+            }
+        } else {
+            lastUpState = false;
+        }
+        
+        if (Keyboard.isKeyDown(Keyboard.KEY_DOWN)) {
+            if (!lastDownState) {
+                lastDownState = true;
+                screen.incDrawDist(-Chunk.CHUNK_S * Voxel.BLOCK_SIZE);
+            }
+        } else {
+            lastDownState = false;
         }
 
         worldMovement();

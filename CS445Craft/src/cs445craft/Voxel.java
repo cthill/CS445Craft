@@ -36,7 +36,10 @@ public class Voxel {
         DARK_TRUNK,
         CACTUS,
         PUMPKIN,
-        SNOW
+        SNOW,
+        LAVA,
+        COBBLE_STONE,
+        SAND_STONE
     }
     
     public static boolean isTranslucent(VoxelType v) {
@@ -73,20 +76,23 @@ public class Voxel {
             v == VoxelType.RED_MUSHROOM ||
             v == VoxelType.MUSHROOM ||
             v == VoxelType.TALL_GRASS ||
-            v == VoxelType.SNOW
+            v == VoxelType.SNOW ||
+            v == VoxelType.LAVA
         );
     }
     
     public static boolean isBreakable(VoxelType v) {
         return !(
             v == VoxelType.WATER ||
-            v == VoxelType.BEDROCK
+            v == VoxelType.BEDROCK ||
+            v == VoxelType.LAVA
         );
     }
     
     public static boolean isMineThrough(VoxelType v) {
         return (
-            v == VoxelType.WATER
+            v == VoxelType.WATER ||
+            v == VoxelType.LAVA
         );
     }
     
@@ -223,6 +229,22 @@ public class Voxel {
             case SNOW:
                 topX = btmX = lftX = rhtX = fntX = bckX = 2;
                 topY = btmY = lftY = rhtY = fntY = bckY = 4;
+                break;
+            case LAVA:
+                topX = btmX = lftX = rhtX = fntX = bckX = 15;
+                topY = btmY = lftY = rhtY = fntY = bckY = 15;
+                break;
+            case COBBLE_STONE:
+                topX = btmX = lftX = rhtX = fntX = bckX = 0;
+                topY = btmY = lftY = rhtY = fntY = bckY = 1;
+                break;
+            case SAND_STONE:
+                topX = 0;
+                topY = 11;
+                btmX = 0;
+                btmY = 13;
+                lftX = rhtX = bckX = fntX = 0;
+                lftY = rhtY = bckY = fntY = 12;
                 break;
             default:
                 topX = btmX = lftX = rhtX = fntX = bckX = 11;
@@ -459,6 +481,4 @@ public class Voxel {
         
         return floatsPerFace * quadsAdded;
     }
-    
-    
 }

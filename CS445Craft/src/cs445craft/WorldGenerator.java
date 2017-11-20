@@ -42,9 +42,9 @@ public class WorldGenerator {
         this.initialSize = initialSize;
         this.rand = new Random();
         
-        noiseGenHeight = new SimplexNoise(90, 0.40, seed);
+        noiseGenHeight = new SimplexNoise(120, 0.35, seed);
         noiseGenType = new SimplexNoise(45, .1, seed + 1);
-        noiseGenBiome = new SimplexNoise(Chunk.CHUNK_S * 25, 0.1, seed + 2);
+        noiseGenBiome = new SimplexNoise(Chunk.CHUNK_S * 25, 0.09, seed + 2);
     }
     
     public World getOrGenerate() {
@@ -73,8 +73,9 @@ public class WorldGenerator {
     }
     
     private void fillChunkGenerateRandom(Chunk chunk) {
-        int maxDelta = 15;
-        int headroom = 3;
+        int maxDelta = 30;
+        int shiftUp = 15;
+        int headroom = 7;
         
         VoxelType[][][] blocks = new VoxelType[CHUNK_S][CHUNK_H][CHUNK_S];
         
@@ -85,40 +86,48 @@ public class WorldGenerator {
                 Biome biome = getBiome(noiseX, noiseZ);
                 
                 double noise = noiseGenHeight.getNoise(noiseX, noiseZ);
-                int heightDelta = (int) (maxDelta * noise + maxDelta) - 1;
+                int heightDelta = (int) Math.abs(maxDelta * noise - maxDelta);
                 if (heightDelta > maxDelta) {
                     heightDelta = maxDelta;
                 }
                 
-                int maxHeight = CHUNK_H - heightDelta - headroom;
+                int maxHeight = CHUNK_H - heightDelta + shiftUp;
+                if (maxHeight >= CHUNK_H) {
+                    maxHeight = CHUNK_H - 1;
+                }
+                maxHeight -= headroom;
+                
                 for (int y = 0; y < maxHeight; y++) {
-                    Voxel.VoxelType type = Voxel.VoxelType.BEDROCK;
+                    VoxelType type = VoxelType.BEDROCK;
                     
-                    if (y < maxHeight - 1) {
+                    boolean topBlock = (y == maxHeight - 1);
+                    if (!topBlock) {
                         if (y >= 1 && y < CHUNK_H / 2) {
-                            type = Voxel.VoxelType.STONE;
+                            type = VoxelType.STONE;
                             if (rand.nextDouble() < 0.001) {
                                 if (y < 6)
-                                    generateOreVein(blocks, x, y, z, Voxel.VoxelType.DIAMOND);
+                                    generateOreVein(blocks, x, y, z, VoxelType.DIAMOND);
                                 else if (y < 10)
-                                    generateOreVein(blocks, x, y, z, Voxel.VoxelType.GOLD);
+                                    generateOreVein(blocks, x, y, z, VoxelType.GOLD);
                             } else if (rand.nextDouble() < 0.05 && y < 16) {
                                 if (rand.nextDouble() < 0.5)
-                                    generateOreVein(blocks, x, y, z, Voxel.VoxelType.IRON);
+                                    generateOreVein(blocks, x, y, z, VoxelType.IRON);
                                 else
-                                    generateOreVein(blocks, x, y, z, Voxel.VoxelType.COAL);
+                                    generateOreVein(blocks, x, y, z, VoxelType.COAL);
                             }
                             
                         } else if (y >= CHUNK_H / 2) {
                             if (biome == Biome.DESERT) {
-                                type = Voxel.VoxelType.SAND;
+                                type = VoxelType.SAND_STONE;
+                            } else if (biome == Biome.ROCKY) {
+                                type = VoxelType.STONE;
                             } else {
-                                type = Voxel.VoxelType.DIRT;
+                                type = VoxelType.DIRT;
                             }
                         }
                     } else {
                         if (biome == Biome.DESERT) {
-                            type = Voxel.VoxelType.SAND;
+                            type = VoxelType.SAND;
                             generateDesertFoliage(blocks, x, y, z);
                         } else {
                             boolean lowPoint = (heightDelta == maxDelta);
@@ -127,24 +136,25 @@ public class WorldGenerator {
                                 float v = (float) (noiseGenType.getNoise(noiseX, y, noiseZ) + 1) / 2;
                                 if (v > 0.485) {
                                     if (biome == Biome.WINTER) {
-                                        type = Voxel.VoxelType.ICE;
+                                        type = VoxelType.ICE;
                                     } else {
-                                        type = Voxel.VoxelType.WATER;
+                                        type = VoxelType.WATER;
+                                        blocks[x][y-1][z] = VoxelType.DIRT;
                                     }
                                 } else {
-                                    type = Voxel.VoxelType.SAND;
+                                    type = VoxelType.SAND;
                                     if (biome == Biome.WINTER) {
                                         blocks[x][y+1][z] = VoxelType.SNOW;
-                                    } else if (biome == Biome.NORMAL) {
+                                    } else {
                                         generateWetSandFoliage(blocks, x, y, z);
                                     }
                                 }
                             } else {
                                 if (biome == Biome.WINTER) {
-                                    type = Voxel.VoxelType.ICE_GRASS;
+                                    type = VoxelType.ICE_GRASS;
                                     generateWinterFoliage(blocks, x, y, z);
                                 } else {
-                                    type = Voxel.VoxelType.GRASS;
+                                    type = VoxelType.GRASS;
                                     geterateFoliage(blocks, x, y, z);
                                 }
                             }
@@ -159,11 +169,13 @@ public class WorldGenerator {
     }
     
     private Biome getBiome(int x, int y) {
-        double biomeNoise = Math.abs(noiseGenBiome.getNoise(x, y)) * 2;
-        if (biomeNoise > 0.11) {
-            return Biome.NORMAL;
-        } else if (biomeNoise > 0.05) {
+        double biomeNoise = Math.abs(noiseGenBiome.getNoise(x, y)) * 3;
+        if (biomeNoise > 0.21) {
+            return Biome.ROCKY;
+        } else if (biomeNoise > 0.155) {
             return Biome.WINTER;
+        } else if (biomeNoise > 0.06) {
+            return Biome.NORMAL;
         } else {
             return Biome.DESERT;
         }
@@ -211,17 +223,17 @@ public class WorldGenerator {
     
     private void geterateFoliage(VoxelType[][][] blocks, int x, int y, int z) {
         if (rand.nextDouble() < 0.05) 
-            blocks[x][y+1][z] = Voxel.VoxelType.TALL_GRASS;
+            blocks[x][y+1][z] = VoxelType.TALL_GRASS;
         if (rand.nextDouble() < 0.0040)
-            blocks[x][y+1][z] = Voxel.VoxelType.RED_FLOWER;
+            blocks[x][y+1][z] = VoxelType.RED_FLOWER;
         if (rand.nextDouble() < 0.0040)
-            blocks[x][y+1][z] = Voxel.VoxelType.YELLOW_FLOWER;
+            blocks[x][y+1][z] = VoxelType.YELLOW_FLOWER;
         if (rand.nextDouble() < 0.001)
-            blocks[x][y+1][z] = Voxel.VoxelType.PUMPKIN;
+            blocks[x][y+1][z] = VoxelType.PUMPKIN;
         if (rand.nextDouble() < 0.001)
-            blocks[x][y+1][z] = Voxel.VoxelType.RED_MUSHROOM;
+            blocks[x][y+1][z] = VoxelType.RED_MUSHROOM;
         if (rand.nextDouble() < 0.001)
-            blocks[x][y+1][z] = Voxel.VoxelType.MUSHROOM;
+            blocks[x][y+1][z] = VoxelType.MUSHROOM;
         if (rand.nextDouble() < 0.0015)
             generateTree(blocks, x, y + 1, z, false);
     }
@@ -233,7 +245,7 @@ public class WorldGenerator {
             int min = 2;
             int height = rand.nextInt(max - min + 1) + min;
             for (int i = 1; i <= height; i++) {
-                blocks[x][y+i][z] = Voxel.VoxelType.REED;
+                blocks[x][y+i][z] = VoxelType.REED;
             }
         }
     }
@@ -251,7 +263,7 @@ public class WorldGenerator {
             int min = 3;
             int height = rand.nextInt(max - min + 1) + min;
             for (int i = 1; i <= height; i++) {
-                blocks[x][y+i][z] = Voxel.VoxelType.CACTUS;
+                blocks[x][y+i][z] = VoxelType.CACTUS;
             }
         }
     }
@@ -262,6 +274,10 @@ public class WorldGenerator {
     * addBlocks method (which includes bounds checking) to place the blocks.
     **/
     private void generateTree(VoxelType[][][] blocks, int x, int y, int z, boolean snowy) {
+        if (x == 0 || x == CHUNK_S || z == 0 || z == CHUNK_S) {
+            return;
+        }
+        
         int[] trunkCoords = new int[] {
             x, y++, z,
             x, y++, z,
@@ -357,7 +373,7 @@ public class WorldGenerator {
                     // generate the chunk later
                     newTasks.add((Runnable) () -> {
                         fillChunkGenerateRandom(c);
-                        System.out.println("Generated new chunk " + indexI + " " + indexJ);
+                        //System.out.println("Generated new chunk " + indexI + " " + indexJ);
                     });
                 }
             }

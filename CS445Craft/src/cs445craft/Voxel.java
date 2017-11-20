@@ -30,13 +30,15 @@ public class Voxel {
         COAL,
         IRON,
         GOLD,
-        DIAMOND
+        DIAMOND,
+        ICE
     }
     
     public static boolean isTranslucent(VoxelType v) {
         return (
             v == VoxelType.WATER ||
-            v == VoxelType.GLASS
+            v == VoxelType.GLASS ||
+            v == VoxelType.ICE
         );
     }
     
@@ -177,6 +179,10 @@ public class Voxel {
             case DIAMOND:
                 topX = btmX = lftX = rhtX = fntX = bckX = 2;
                 topY = btmY = lftY = rhtY = fntY = bckY = 3;
+                break;
+            case ICE:
+                topX = btmX = lftX = rhtX = fntX = bckX = 3;
+                topY = btmY = lftY = rhtY = fntY = bckY = 4;
                 break;
             default:
                 topX = btmX = lftX = rhtX = fntX = bckX = 11;

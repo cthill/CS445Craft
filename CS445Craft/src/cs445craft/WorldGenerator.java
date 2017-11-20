@@ -6,10 +6,10 @@
 package cs445craft;
 
 import cs445craft.Voxel.VoxelType;
-import static cs445craft.World.CHUNK_H;
-import static cs445craft.World.CHUNK_S;
-import java.io.IOException;
+import static cs445craft.Chunk.CHUNK_H;
+import static cs445craft.Chunk.CHUNK_S;
 import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Random;
@@ -20,16 +20,18 @@ import java.util.Set;
  * @author cthill
  */
 public class WorldGenerator {
-    private static final int CHUNK_GENERATION_BOUNDARY = 2;
+    private static final int CHUNK_GENERATION_BOUNDARY = 3;
     private int seed;
+    private int initialSize;
     private Random rand;
     
     private SimplexNoise noiseGenHeight;
     private SimplexNoise noiseGenType;
     private World world;
     
-    public WorldGenerator(int seed) {
+    public WorldGenerator(int seed, int initialSize) {
         this.seed = seed;
+        this.initialSize = initialSize;
         this.rand = new Random();
         
         noiseGenHeight = new SimplexNoise(90, 0.40, seed);
@@ -40,15 +42,14 @@ public class WorldGenerator {
         if (world != null) {
             return world;
         }
-        
-        int initialSize = 3;
-        
-        world = new World(initialSize);
+
+        world = new World();
         
         for (int i = 0; i < initialSize; i++) {
             for (int j = 0; j < initialSize; j++) {
-                Chunk c = generateRandomChunk(i, j);
-                world.addChunk(i, j, c);
+                Chunk c = createChunk(i, j);
+                fillChunkGenerateRandom(c);
+                world.addChunk(c);
             }
         }
         
@@ -58,32 +59,55 @@ public class WorldGenerator {
         return world;
     }
     
-    public List<Chunk> newChunkPosition(int i, int j) {
+    
+    public List<Runnable> newChunkPosition(int i, int j, Screen s) {
+        List<Runnable> newTasks = new ArrayList<>();
         List<Chunk> newChunks = new ArrayList<>();
 
         for (int di = -CHUNK_GENERATION_BOUNDARY; di <= CHUNK_GENERATION_BOUNDARY; di++) {
             for (int dj = -CHUNK_GENERATION_BOUNDARY; dj <= CHUNK_GENERATION_BOUNDARY; dj++) {
-                if (world.getChunk(i + di, j + dj) == null) {
-                    Chunk c = generateRandomChunk(i + di, j + dj);
-                    world.addChunk(i + di, j + dj, c);
+                final int indexI = i + di;
+                final int indexJ = j + dj;
+                
+                if (world.getChunk(indexI, indexJ) == null) {
+                    Chunk c = createChunk(indexI, indexJ);
                     newChunks.add(c);
+                    world.addChunk(c);
+                    
+                    // generate the chunk later
+                    newTasks.add((Runnable) () -> {
+                        fillChunkGenerateRandom(c);
+                        //System.out.println("Generated new chunk " + indexI + " " + indexJ);
+                    });
                 }
             }
         }
 
         Set<Chunk> newAndAdjacentChunks = new HashSet<>();
         newAndAdjacentChunks.addAll(newChunks);
-        newChunks.forEach(chunk -> newAndAdjacentChunks.addAll(world.findAdjacent(chunk)));
-        newAndAdjacentChunks.forEach(chunk -> chunk.rebuildMesh());
+        newChunks.forEach(chunk -> newAndAdjacentChunks.addAll(world.findAllAdjacentChunks(chunk)));
+        
+        // sort the chunks so the closest ones are built first
+        List<Chunk> newAndAdjacentChunksSorted = new ArrayList<>(newAndAdjacentChunks);
+        newAndAdjacentChunksSorted.sort(Comparator.comparing(object -> ((Chunk) object).gridDistanceTo(i, j)));
+        
+        // add tasks to asynchronously rebuild the meshes
+        newAndAdjacentChunksSorted.forEach(chunk -> {
+            newTasks.add((Runnable) () -> {
+                chunk.rebuildMesh();
+                s.addObject(chunk);
+                //System.out.println("rebuilt chunk " + chunk.i + " " + chunk.j);
+            });
+        });
 
-        return newChunks;
+        return newTasks;
     }
     
-    private Chunk generateRandomChunk(int i, int j) {
-        int chunkX = i * CHUNK_S * Voxel.BLOCK_SIZE;
-        int chunkZ = j * CHUNK_S * Voxel.BLOCK_SIZE;
-        Chunk chunk = new Chunk(world, chunkX, chunkZ, CHUNK_S, CHUNK_H);
-        
+    private Chunk createChunk(int i, int j) {
+        return new Chunk(world, i, j);
+    }
+    
+    private void fillChunkGenerateRandom(Chunk chunk) {
         int maxDelta = 15;
         int headroom = 3;
         
@@ -91,8 +115,8 @@ public class WorldGenerator {
         
         for (int x = 0; x < CHUNK_S; x++) {
             for (int z = 0; z < CHUNK_S; z++) {
-                int noiseX = x + i * CHUNK_S;
-                int noiseZ = z + j * CHUNK_S;
+                int noiseX = x + chunk.i * CHUNK_S;
+                int noiseZ = z + chunk.j * CHUNK_S;
                 
                 double noise = noiseGenHeight.getNoise(noiseX, noiseZ);
                 int heightDelta =(int) (maxDelta * noise + maxDelta) - 1;
@@ -158,7 +182,6 @@ public class WorldGenerator {
         }
         
         chunk.copyBlocks(blocks, 0, CHUNK_S, 0, CHUNK_H, 0, CHUNK_S);
-        return chunk;
     }
     
     private void generateOreVein(VoxelType[][][] blocks, int x, int y, int z, VoxelType v) {
@@ -265,5 +288,15 @@ public class WorldGenerator {
                 }
             }
         }
+    }
+    
+    private class ChunkGenerationTask implements Runnable {
+
+        
+        
+        public void run() {
+            
+        }
+        
     }
 }

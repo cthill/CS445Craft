@@ -23,7 +23,8 @@ public class Camera {
         this.x = x;
         this.y = y;
         this.z = z;
-        pitch = 180.0f;
+        this.yaw = 180.0f;
+        this.pitch = 0.0f;
     }
     
     /**

@@ -19,6 +19,7 @@ import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Comparator;
 import java.util.List;
+import java.util.stream.Collectors;
 import org.lwjgl.LWJGLException;
 import org.lwjgl.opengl.Display;
 import org.lwjgl.opengl.DisplayMode;
@@ -27,12 +28,12 @@ import org.lwjgl.util.glu.GLU;
 import org.newdawn.slick.TrueTypeFont;
 
 public class Screen {
-    private static final int DRAW_DIST = World.CHUNK_S * Voxel.BLOCK_SIZE * 3;
-    private int width, height;
+    private static final float DRAW_DIST = Chunk.CHUNK_S * Voxel.BLOCK_SIZE * 3.5f;
+    private final int width, height;
     private float r, g, b;
-    private String title;
-    private Camera camera;
-    private List<Drawable> objects;
+    private final String title;
+    private final Camera camera;
+    private final List<Drawable> objects;
     private Font awtFont;
     private TrueTypeFont font;
     
@@ -70,11 +71,14 @@ public class Screen {
     * be drawn to the screen on each frame.
     **/
     public void addObject(Drawable object) {
-        objects.add(object);
+        if (!objects.contains(object)) {
+            objects.add(object);
+        }
     }
     
     public void addObjects(Collection< ? extends Drawable> coll) {
-        objects.addAll(coll);
+        Collection< ? extends Drawable> filtered = coll.stream().filter(object -> !objects.contains(object)).collect(Collectors.toList());
+        objects.addAll(filtered);
     }
     
     public void setTintColor(float r, float g, float b) {

@@ -16,20 +16,19 @@
 package cs445craft;
 
 import cs445craft.Voxel.VoxelType;
-import java.io.File;
-import java.io.FileInputStream;
-import java.io.IOException;
 import java.nio.FloatBuffer;
 import org.lwjgl.BufferUtils;
 import static org.lwjgl.opengl.GL11.*;
 import static org.lwjgl.opengl.GL15.*;
 
 public class Chunk extends Drawable {
+    public static final int CHUNK_S = 30;
+    public static final int CHUNK_H = 45;
+    public static final int NUM_BLOCKS = CHUNK_S * CHUNK_H * CHUNK_S;
+    
     private World world;
+    public int i, j;
     public float chunkX, chunkY, chunkZ;
-    private int chunkSize;
-    private int chunkHeight;
-    private int numBlocks;
     private VoxelType[][][] blocks;
     
     private boolean excludeHidden;
@@ -41,26 +40,27 @@ public class Chunk extends Drawable {
     private int VBOVertexHandleTranslucent;
     private int VBOTextureHandleTranslucent;
     
-    public Chunk(World world, float chunkX, float chunkZ, int chunkSize, int chunkHeight) {
+    public Chunk(World world, int i, int j) {
         this.world = world;
-        this.chunkX = chunkX;
-        this.chunkY = 0.0f;
-        this.chunkZ = chunkZ;
-        this.chunkSize = chunkSize;
-        this.chunkHeight = chunkHeight;
-        this.numBlocks = chunkSize * chunkHeight * chunkSize;
-        excludeHidden = true;
+        this.i = i;
+        this.j = j;
         
-        blocks = new VoxelType[chunkSize][chunkHeight][chunkSize];
+        chunkX = i * CHUNK_S * Voxel.BLOCK_SIZE;
+        chunkZ = j * CHUNK_S * Voxel.BLOCK_SIZE;
+        chunkY = 0.0f;
+        
+        blocks = new VoxelType[CHUNK_S][CHUNK_H][CHUNK_S];
+        
+        excludeHidden = true;
     }
     
     public void copyBlocks(VoxelType[][][] wBlocks, int sx, int lx, int sy, int ly, int sz, int lz) {
-        if (lx > chunkSize)
-            lx = chunkSize;
-        if (ly > chunkHeight)
-            ly = chunkHeight;
-        if (lz > chunkSize)
-            lz = chunkSize;
+        if (lx > CHUNK_S)
+            lx = CHUNK_S;
+        if (ly > CHUNK_H)
+            ly = CHUNK_H;
+        if (lz > CHUNK_S)
+            lz = CHUNK_S;
         
         int x = 0;
         for (int ix = sx; ix < sx + lx; ix++) {
@@ -90,12 +90,12 @@ public class Chunk extends Drawable {
             
             if (x == 0)
                 xDir = -1;
-            else if (x == chunkSize - 1)
+            else if (x == CHUNK_S - 1)
                 xDir = 1;
 
             if (z == 0)
                 zDir = -1;
-            else if (z == chunkSize - 1)
+            else if (z == CHUNK_S - 1)
                 zDir = 1;
 
             if (xDir != 0) {
@@ -135,7 +135,7 @@ public class Chunk extends Drawable {
             }
         }
         
-        return chunkHeight;
+        return CHUNK_H;
     }
     
     /**
@@ -145,9 +145,9 @@ public class Chunk extends Drawable {
     **/
     private VoxelType safeLookup(int x, int y, int z) {
         if (
-            x >= 0 && x < chunkSize &&
-            y >= 0 && y < chunkHeight &&
-            z >= 0 && z < chunkSize
+            x >= 0 && x < CHUNK_S &&
+            y >= 0 && y < CHUNK_H &&
+            z >= 0 && z < CHUNK_S
         ) {
             return blocks[x][y][z];
         }
@@ -187,8 +187,12 @@ public class Chunk extends Drawable {
         glPopMatrix();
     }
     
+    public float gridDistanceTo(int i, int j) {
+        return (float) Math.sqrt(Math.pow(this.i - i, 2) + Math.pow(this.j - j, 2));
+    }
+    
     public float distanceTo(float x, float y, float z) {
-        return (float) Math.sqrt(Math.pow(chunkX + chunkSize - x, 2) + Math.pow(chunkY + chunkHeight - y, 2) + Math.pow(chunkZ + chunkSize - z, 2));
+        return (float) Math.sqrt(Math.pow(chunkX + CHUNK_S - x, 2) + Math.pow(chunkY + CHUNK_H - y, 2) + Math.pow(chunkZ + CHUNK_S - z, 2));
     }
 
     /**
@@ -218,27 +222,26 @@ public class Chunk extends Drawable {
     * render to the screen. If the excludeHidden flag is set, faces that can not
     * be see will not be included in the mesh.
     **/
-    public void rebuildMesh() {
-        
+    public void rebuildMesh() {        
         int floatsPerFacePosition = 3 * 4;
         int floatsPerFaceTexture = 2 * 4;        
 
         int writeIndexPosition = 0;
         int writeIndexTexture = 0;
-        float[] positionData = new float[numBlocks * 6 * floatsPerFacePosition];
-        float[] textureData = new float[numBlocks * 6 * floatsPerFaceTexture];
+        float[] positionData = new float[NUM_BLOCKS * 6 * floatsPerFacePosition];
+        float[] textureData = new float[NUM_BLOCKS * 6 * floatsPerFaceTexture];
         
         int writeIndexPositionTranslucent = 0;
         int writeIndexTextureTranslucent = 0;
-        float[] positionDataTranslucent = new float[numBlocks * 6 * floatsPerFacePosition];
-        float[] textureDataTranslucent = new float[numBlocks * 6 * floatsPerFaceTexture];
+        float[] positionDataTranslucent = new float[NUM_BLOCKS * 6 * floatsPerFacePosition];
+        float[] textureDataTranslucent = new float[NUM_BLOCKS * 6 * floatsPerFaceTexture];
 
         int totalFaces = 0;
         int totalFacesTranslucent = 0;
         
-        for (int x = 0; x < chunkSize; x++) {
-            for (int z = 0; z < chunkSize; z++) {
-                for (int y = 0; y < chunkHeight; y++) {
+        for (int x = 0; x < CHUNK_S; x++) {
+            for (int z = 0; z < CHUNK_S; z++) {
+                for (int y = 0; y < CHUNK_H; y++) {
                     VoxelType voxelType = blocks[x][y][z];
                     
                     // null is used for empty cells
@@ -277,7 +280,7 @@ public class Chunk extends Drawable {
                         // compute faces that can not be seen
                         faceVisible = new boolean[] {
                             above == null || (!translucentTexture && Voxel.isSeeTrough(above)),
-                            below == null || (!translucentTexture && Voxel.isSeeTrough(below)),
+                            (below == null || (!translucentTexture && Voxel.isSeeTrough(below))) && y > 0,
                             front == null || (!translucentTexture && Voxel.isSeeTrough(front)),
                             back  == null || (!translucentTexture && Voxel.isSeeTrough(back)),
                             left  == null || (!translucentTexture && Voxel.isSeeTrough(left)),
@@ -356,7 +359,7 @@ public class Chunk extends Drawable {
     }
     
     public VoxelType lookupTraverseChunks(int x, int y, int z) {
-        if (y < 0 || y > chunkHeight - 1) {
+        if (y < 0 || y > CHUNK_H - 1) {
             return null;
         }
         
@@ -365,12 +368,12 @@ public class Chunk extends Drawable {
 
         if (x < 0)
             xDir = -1;
-        else if (x > chunkSize - 1)
+        else if (x > CHUNK_S - 1)
             xDir = 1;
 
         if (z < 0)
             zDir = -1;
-        else if (z > chunkSize -1)
+        else if (z > CHUNK_S -1)
             zDir = 1;
         
         // not traversing chunk boundary, lookup block in this chunk
@@ -388,7 +391,7 @@ public class Chunk extends Drawable {
         // lookup block in adjacent chunk
         // reason for using Math.floorMod instead of regular mod:
         // https://stackoverflow.com/questions/4412179/best-way-to-make-javas-modulus-behave-like-it-should-with-negative-numbers/25830153#25830153
-        return adjacentChunk.safeLookup(Math.floorMod(x, chunkSize), y, Math.floorMod(z, chunkSize));
+        return adjacentChunk.safeLookup(Math.floorMod(x, CHUNK_S), y, Math.floorMod(z, CHUNK_S));
     }
 
     

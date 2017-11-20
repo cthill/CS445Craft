@@ -5,8 +5,9 @@
  */
 package cs445craft;
 
+import static cs445craft.Chunk.CHUNK_H;
+import static cs445craft.Chunk.CHUNK_S;
 import cs445craft.Voxel.VoxelType;
-import java.io.IOException;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -14,34 +15,27 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 
-public class World {
-    public static final int CHUNK_S = 30; // 30 x 30 x 30 chunk
-    public static final int CHUNK_H = 45; // 30 x 30 x 30 chunk
+public class World {    
+    private final List<Chunk> chunksList;
+    private final Map<Integer, Map<Integer, Chunk>> chunks;
+    private final Map<Chunk, Integer> chunkToIndexI;
+    private final Map<Chunk, Integer> chunkToIndexJ;
     
-    public static final int NUM_BLOCKS = CHUNK_S * CHUNK_S * CHUNK_H;
-    
-    private int size;
-    private List<Chunk> chunksList;
-    private Map<Integer, Map<Integer, Chunk>> chunks;
-    private Map<Chunk, Integer> chunkToIndexI;
-    private Map<Chunk, Integer> chunkToIndexJ;
-    
-    public World(int size) {
-        this.size = size;
+    public World() {
         chunksList = new ArrayList<>();
         chunks = new HashMap<>();        
         chunkToIndexI = new HashMap<>();
         chunkToIndexJ = new HashMap<>();
     }
     
-    public void addChunk(int i, int j, Chunk c) {
-        chunksList.add(c);
-        if (chunks.get(i) == null) {
-            chunks.put(i, new HashMap<>());
+    public void addChunk(Chunk chunk) {
+        chunksList.add(chunk);
+        if (chunks.get(chunk.i) == null) {
+            chunks.put(chunk.i, new HashMap<>());
         }
-        chunks.get(i).put(j, c);
-        chunkToIndexI.put(c, i);
-        chunkToIndexJ.put(c, j);
+        chunks.get(chunk.i).put(chunk.j, chunk);
+        chunkToIndexI.put(chunk, chunk.i);
+        chunkToIndexJ.put(chunk, chunk.j);
     }
     
     public Chunk getChunk(int i, int j) {
@@ -49,6 +43,10 @@ public class World {
             return null;
         }
         return chunks.get(i).get(j);
+    }
+    
+    public List<Chunk> getChunks() {
+        return chunksList;
     }
     
     public Chunk findAdjacentChunk(Chunk thisChunk, int xDir, int zDir) {
@@ -71,7 +69,7 @@ public class World {
         return getChunk(i, j);
     }
     
-    public Set<Chunk> findAdjacent(Chunk c) {
+    public Set<Chunk> findAllAdjacentChunks(Chunk c) {
         Set<Chunk> adjacent = new HashSet<>();
         Integer i = chunkToIndexI.get(c);
         Integer j = chunkToIndexJ.get(c);
@@ -86,18 +84,6 @@ public class World {
         adjacent.remove(null);
         
         return adjacent;
-    }
-    
-    public List<Chunk> getChunks() {
-        return chunksList;
-    }
-    
-    public float getWidth() {
-        return CHUNK_S * Voxel.BLOCK_SIZE * size;
-    }
-    
-    public int getSize() {
-        return size;
     }
     
     public int worldPosToBlockIndex(float pos) {
@@ -181,10 +167,8 @@ public class World {
     }
     
     public void swapMeshes() {
-        for (int i = 0; i < size; i++) {
-            for (int j = 0; j < size; j++) {
-                getChunk(i, j).swapMesh();
-            }
+        for (Chunk c: getChunks()) {
+            c.swapMesh();
         }
     }
 }

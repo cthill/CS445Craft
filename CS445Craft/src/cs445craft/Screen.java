@@ -28,7 +28,7 @@ import org.lwjgl.util.glu.GLU;
 import org.newdawn.slick.TrueTypeFont;
 
 public class Screen {
-    private static float DRAW_DIST = Chunk.CHUNK_S * Voxel.BLOCK_SIZE * 4.5f;
+    private static float DRAW_DIST = Chunk.CHUNK_S * Voxel.BLOCK_SIZE * 7.5f;
     private final int width, height;
     private float r, g, b;
     private final String title;
@@ -108,7 +108,7 @@ public class Screen {
         glDisable(GL_BLEND);
         glMatrixMode(GL_PROJECTION);
         glLoadIdentity();
-        GLU.gluPerspective(100.0f, (float) width / (float) height, 0.05f, 300.0f);
+        GLU.gluPerspective(100.0f, (float) width / (float) height, 0.05f, DRAW_DIST);
         glMatrixMode(GL_MODELVIEW);
         glHint(GL_PERSPECTIVE_CORRECTION_HINT, GL_NICEST);
         glClear(GL_COLOR_BUFFER_BIT | GL_DEPTH_BUFFER_BIT);

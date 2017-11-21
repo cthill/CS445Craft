@@ -9,6 +9,7 @@ import cs445craft.Voxel.VoxelType;
 import static cs445craft.Chunk.CHUNK_H;
 import static cs445craft.Chunk.CHUNK_S;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Comparator;
 import java.util.HashSet;
 import java.util.List;
@@ -20,21 +21,45 @@ import java.util.Set;
  * @author cthill
  */
 public class WorldGenerator {
-    private static final int CHUNK_GENERATION_BOUNDARY = 3;
+    // generator constants
+    private static int CHUNK_GENERATION_BOUNDARY = 3;
+    private static final int FOLIAGE_HEADROOM = 8; // headroom for foliage generation on top of world
+    private static final int WORLD_HEADROOM = 15; // headroom for player building on top of world
+    private static final int BEDROCK_HEIGHT = 1;
+    private static final int ROCK_LAYER_HEIGHT = (Chunk.CHUNK_H - WORLD_HEADROOM) / 2;
+    private static final int UPPER_LAYER_DIRT_DEPTH = 8;
+    private static final int UPPER_LAYER_MAX_HEIGHT_DELTA = 30;
+    
+    private static final int DIAMOND_MAX_HEIGHT = 10;
+    private static final int GOLD_MAX_HEIGHT = 20;
+    private static final double DIAMOND_RATE = 0.0025;
+    private static final double GOLD_RATE = 0.005;
+    private static final double IRON_RATE = 0.01;
+    private static final double COAL_RATE = 0.01;
+    private static final int ORE_VEIN_MIN = 1;
+    private static final int ORE_VEIN_MAX = 8;
+    
+    private static final int NOISE_FACTOR_HEIGHT = 10;
+    private static final int NOISE_FACTOR_LOCAL_HEIGHT = 2;
+    private static final int NOISE_FACTOR_REGION_HEIGHT = 14;
+            
+            
     private final int seed;
     private final int initialSize;
     private final Random rand;
     
-    private final SimplexNoise noiseGenHeight;
-    private final SimplexNoise noiseGenType;
+    private final SimplexNoise noiseGenLocalHeight;
+    private final SimplexNoise noiseGenBlockType;
     private final SimplexNoise noiseGenBiome;
+    private final SimplexNoise noiseGenRegionHeight;
+    private final SimplexNoise noiseGenCavern;
     private World world;
     
     public static enum Biome {
         NORMAL,
-        ROCKY,
         DESERT,
-        WINTER
+        WINTER,
+        OCEAN
     }
     
     public WorldGenerator(int seed, int initialSize) {
@@ -42,9 +67,11 @@ public class WorldGenerator {
         this.initialSize = initialSize;
         this.rand = new Random();
         
-        noiseGenHeight = new SimplexNoise(120, 0.35, seed);
-        noiseGenType = new SimplexNoise(45, .1, seed + 1);
-        noiseGenBiome = new SimplexNoise(Chunk.CHUNK_S * 25, 0.09, seed + 2);
+        noiseGenLocalHeight = new SimplexNoise(Chunk.CHUNK_S * 5, 0.30, seed);
+        noiseGenRegionHeight = new SimplexNoise(Chunk.CHUNK_S * 10, 0.25, seed + 1);
+        noiseGenBlockType = new SimplexNoise(25, .15, seed + 2);
+        noiseGenBiome = new SimplexNoise(Chunk.CHUNK_S * 25, 0.09, seed + 3);
+        noiseGenCavern = new SimplexNoise(30, .1, seed + 4);
     }
     
     public World getOrGenerate() {
@@ -72,119 +99,243 @@ public class WorldGenerator {
         return new Chunk(world, i, j);
     }
     
+    private double getNoise2d(SimplexNoise noiseGen, int x, int y) {
+        return noiseGen.getNoise(x, y);
+    }
+    
+    private double getNoise3d(SimplexNoise noiseGen, int x, int y, int z) {
+        return noiseGen.getNoise(x, y, z );
+    }
+    
     private void fillChunkGenerateRandom(Chunk chunk) {
-        int maxDelta = 30;
-        int shiftUp = 15;
-        int headroom = 7;
-        
         VoxelType[][][] blocks = new VoxelType[CHUNK_S][CHUNK_H][CHUNK_S];
         
+        // generate heights for each xz position
+        int[][] cellHeights = new int[CHUNK_S][CHUNK_S];
+        Biome[][] biomes = new Biome[CHUNK_S][CHUNK_S];
+
         for (int x = 0; x < CHUNK_S; x++) {
             for (int z = 0; z < CHUNK_S; z++) {
                 int noiseX = x + chunk.i * CHUNK_S;
                 int noiseZ = z + chunk.j * CHUNK_S;
-                Biome biome = getBiome(noiseX, noiseZ);
                 
-                double noise = noiseGenHeight.getNoise(noiseX, noiseZ);
-                int heightDelta = (int) Math.abs(maxDelta * noise - maxDelta);
-                if (heightDelta > maxDelta) {
-                    heightDelta = maxDelta;
+                double localHeightNoise = getNoise2d(noiseGenLocalHeight, noiseX, noiseZ) * NOISE_FACTOR_LOCAL_HEIGHT;
+                double regionHeightNoise = 1 + getNoise2d(noiseGenRegionHeight, chunk.i, chunk.j) * NOISE_FACTOR_REGION_HEIGHT;
+                
+                double combinedHeightNoise = Math.abs(NOISE_FACTOR_HEIGHT * localHeightNoise * regionHeightNoise);
+//                System.out.println(localHeightNoise + " " + regionHeightNoise + " " + combinedHeightNoise);                
+                
+                int heightDelta = (int) combinedHeightNoise;
+                if (heightDelta > UPPER_LAYER_MAX_HEIGHT_DELTA) {
+                    heightDelta = UPPER_LAYER_MAX_HEIGHT_DELTA;
+                }
+                if (heightDelta < 1) {
+                    heightDelta = 1;
+                }
+                        
+                int cellHeight = BEDROCK_HEIGHT + ROCK_LAYER_HEIGHT + heightDelta;
+                if (cellHeight > CHUNK_H - 1 - FOLIAGE_HEADROOM - WORLD_HEADROOM) {
+                    cellHeight = CHUNK_H - 1 - FOLIAGE_HEADROOM - WORLD_HEADROOM;
                 }
                 
-                int maxHeight = CHUNK_H - heightDelta + shiftUp;
-                if (maxHeight >= CHUNK_H) {
-                    maxHeight = CHUNK_H - 1;
-                }
-                maxHeight -= headroom;
+                cellHeights[x][z] = cellHeight;
                 
-                for (int y = 0; y < maxHeight; y++) {
-                    VoxelType type = VoxelType.BEDROCK;
-                    
-                    boolean topBlock = (y == maxHeight - 1);
-                    if (!topBlock) {
-                        if (y >= 1 && y < CHUNK_H / 2) {
-                            type = VoxelType.STONE;
-                            if (rand.nextDouble() < 0.001) {
-                                if (y < 6)
-                                    generateOreVein(blocks, x, y, z, VoxelType.DIAMOND);
-                                else if (y < 10)
-                                    generateOreVein(blocks, x, y, z, VoxelType.GOLD);
-                            } else if (rand.nextDouble() < 0.05 && y < 16) {
-                                if (rand.nextDouble() < 0.5)
-                                    generateOreVein(blocks, x, y, z, VoxelType.IRON);
-                                else
-                                    generateOreVein(blocks, x, y, z, VoxelType.COAL);
-                            }
-                            
-                        } else if (y >= CHUNK_H / 2) {
-                            if (biome == Biome.DESERT) {
-                                type = VoxelType.SAND_STONE;
-                            } else if (biome == Biome.ROCKY) {
-                                type = VoxelType.STONE;
-                            } else {
-                                type = VoxelType.DIRT;
-                            }
-                        }
+                double biomeNoise = Math.abs(getNoise2d(noiseGenBiome, noiseX, noiseZ)) * 3;
+                if (Math.abs(localHeightNoise) < 1 && Math.abs(regionHeightNoise) < 1 && Math.abs(combinedHeightNoise) < 3) {
+                    // very low region, generate desert or ocean
+                    if (biomeNoise > 0.10) {
+                        cellHeights[x][z] = BEDROCK_HEIGHT + ROCK_LAYER_HEIGHT + 2;
+                        biomes[x][z] = Biome.OCEAN;
                     } else {
-                        if (biome == Biome.DESERT) {
-                            type = VoxelType.SAND;
-                            generateDesertFoliage(blocks, x, y, z);
-                        } else {
-                            boolean lowPoint = (heightDelta == maxDelta);
-                            
-                            if (lowPoint) {
-                                float v = (float) (noiseGenType.getNoise(noiseX, y, noiseZ) + 1) / 2;
-                                if (v > 0.485) {
-                                    if (biome == Biome.WINTER) {
-                                        type = VoxelType.ICE;
-                                    } else {
-                                        type = VoxelType.WATER;
-                                        blocks[x][y-1][z] = VoxelType.DIRT;
-                                    }
-                                } else {
-                                    type = VoxelType.SAND;
-                                    if (biome == Biome.WINTER) {
-                                        blocks[x][y+1][z] = VoxelType.SNOW;
-                                    } else {
-                                        generateWetSandFoliage(blocks, x, y, z);
-                                    }
-                                }
-                            } else {
-                                if (biome == Biome.WINTER) {
-                                    type = VoxelType.ICE_GRASS;
-                                    generateWinterFoliage(blocks, x, y, z);
-                                } else {
-                                    type = VoxelType.GRASS;
-                                    geterateFoliage(blocks, x, y, z);
-                                }
-                            }
+                        int cnh = (int) (combinedHeightNoise * 1.5);
+                        if (cnh < 2) {
+                            cnh = 2;
                         }
+                        cellHeights[x][z] = BEDROCK_HEIGHT + ROCK_LAYER_HEIGHT + cnh;
+                        biomes[x][z] = Biome.DESERT;
                     }
-                    blocks[x][y][z] = type;
+                } else {
+                    // hilly region, generate normal or winter
+                    if (biomeNoise > 0.12) {
+                        biomes[x][z] = Biome.WINTER;
+                    } else {
+                        biomes[x][z] = Biome.NORMAL;
+                    }
                 }
+            }
+        }
+        
+        //for (int y = ROCK_LAYER_HEIGHT; y < CHUNK_H - WORLD_HEADROOM; y++) {
+        for (int y = 0; y < CHUNK_H - WORLD_HEADROOM; y++) {
+            if (y < BEDROCK_HEIGHT) {
+                generateFlatLayer(blocks, y, VoxelType.BEDROCK);
+            } else if (y < BEDROCK_HEIGHT + ROCK_LAYER_HEIGHT) {
+                generateRockLayer(chunk, blocks, y);
+            } else {
+                generateUpperLayer(chunk, blocks, y, cellHeights, biomes);
             }
         }
         
         chunk.copyBlocks(blocks, 0, CHUNK_S, 0, CHUNK_H, 0, CHUNK_S);
     }
     
-    private Biome getBiome(int x, int y) {
-        double biomeNoise = Math.abs(noiseGenBiome.getNoise(x, y)) * 3;
-        if (biomeNoise > 0.21) {
-            return Biome.ROCKY;
-        } else if (biomeNoise > 0.155) {
-            return Biome.WINTER;
-        } else if (biomeNoise > 0.06) {
-            return Biome.NORMAL;
-        } else {
-            return Biome.DESERT;
+    private void generateFlatLayer(VoxelType[][][] blocks, int y, VoxelType type) {
+        for (int x = 0; x < CHUNK_S; x++) {
+            Arrays.fill(blocks[x][y], type);
         }
     }
     
-    private void generateOreVein(VoxelType[][][] blocks, int x, int y, int z, VoxelType v) {        
-        int max = 8;
-        int min = 2;
-        int length = rand.nextInt(max - min + 1) + min;
+    private void generateRockLayer(Chunk chunk, VoxelType[][][] blocks, int y) {
+        for (int x = 0; x < CHUNK_S; x++) {
+            for (int z = 0; z < CHUNK_S; z++) {
+                generateRockLayerSingle(chunk, blocks, x, y, z);
+            }
+        }
+    }
+    
+    private void generateRockLayerSingle(Chunk chunk, VoxelType[][][] blocks, int x, int y, int z) {
+        int noiseX = x + chunk.i * CHUNK_S;
+        int noiseZ = z + chunk.j * CHUNK_S;
+        double noise = (getNoise3d(noiseGenCavern, noiseX, y, noiseZ) + 1) / 2;
+        boolean openSpace = (noise < 0.475);
+
+        if (!openSpace) {
+            blocks[x][y][z] = VoxelType.STONE;
+            
+            if (y < DIAMOND_MAX_HEIGHT && rand.nextDouble() < DIAMOND_RATE)
+                generateOreVein(blocks, x, y, z, VoxelType.DIAMOND);
+            if (y < GOLD_MAX_HEIGHT && rand.nextDouble() < GOLD_RATE) 
+                generateOreVein(blocks, x, y, z, VoxelType.GOLD);
+            if (rand.nextDouble() < IRON_RATE)
+                generateOreVein(blocks, x, y, z, VoxelType.IRON);
+            if (rand.nextDouble() < COAL_RATE) 
+                generateOreVein(blocks, x, y, z, VoxelType.COAL);
+        }
+    }
+    
+    private void generateUpperLayer(Chunk chunk, VoxelType[][][] blocks, int y, int[][] cellHeights, Biome[][] biomes) {
+        for (int x = 0; x < CHUNK_S; x++) {
+            for (int z = 0; z < CHUNK_S; z++) {
+                if (y > cellHeights[x][z]) {
+                    continue;
+                }
+                
+                int rockyCutoff = cellHeights[x][z] - UPPER_LAYER_DIRT_DEPTH;
+                if (rockyCutoff < BEDROCK_HEIGHT + ROCK_LAYER_HEIGHT) {
+                   rockyCutoff = BEDROCK_HEIGHT + ROCK_LAYER_HEIGHT;
+                }
+                
+                if (y < rockyCutoff) {
+                    generateRockLayerSingle(chunk, blocks, x, y, z);
+                } else {
+                    switch (biomes[x][z]) {
+                        default:
+                        case NORMAL:
+                            generateCellNormalBiome(chunk, blocks, x, y, z, cellHeights[x][z], rockyCutoff);
+                            break;
+                        case WINTER:
+                            generateCellWinterBiome(chunk, blocks, x, y, z, cellHeights[x][z], rockyCutoff);
+                            break;
+                        case OCEAN:
+                            generateCellOceanBiome(chunk, blocks, x, y, z, cellHeights[x][z], rockyCutoff);
+                            break;
+                        case DESERT:
+                            generateCellDesertBiome(chunk, blocks, x, y, z, cellHeights[x][z], rockyCutoff);
+                            break;
+                    }
+                }
+            }
+        }
+    }
+    
+    private void generateCellNormalBiome(Chunk chunk, VoxelType[][][] blocks, int x, int y, int z, int cellHeight, int rockyCutoff) {
+        boolean openSpace = false;
+        int noiseX = x + chunk.i * CHUNK_S;
+        int noiseZ = z + chunk.j * CHUNK_S;
+        double noise = (getNoise3d(noiseGenCavern, noiseX, y, noiseZ) + 1) / 2;
+        if (y == cellHeight) {
+            openSpace = (noise < 0.4525);
+        } else {
+            openSpace = (noise < 0.47);
+        }
+        
+        if (!openSpace) {
+            if (y == cellHeight) {
+                // top layer
+                blocks[x][y][z] = VoxelType.GRASS;
+                geterateGrassFoliage(blocks, x, y, z);
+            } else {
+                blocks[x][y][z] = VoxelType.DIRT;
+            }
+        }
+    }
+    
+    private void generateCellWinterBiome(Chunk chunk, VoxelType[][][] blocks, int x, int y, int z, int cellHeight, int rockyCutoff) {
+        boolean openSpace = false;
+        int noiseX = x + chunk.i * CHUNK_S;
+        int noiseZ = z + chunk.j * CHUNK_S;
+        double noise = (getNoise3d(noiseGenCavern, noiseX, y, noiseZ) + 1) / 2;
+        if (y == cellHeight) {
+            openSpace = (noise < 0.4525);
+        } else {
+            openSpace = (noise < 0.47);
+        }
+        
+        if (!openSpace) {
+            if (y == cellHeight) {
+                // top layer
+                if (cellHeight - rockyCutoff < 2) {
+                    // low top layer
+                    float v = (float) (getNoise3d(noiseGenBlockType, noiseX, y, noiseZ) + 1);
+                    if (v > 1.05) {
+                        blocks[x][y][z] = VoxelType.SAND;
+                        blocks[x][y+1][z] = VoxelType.SNOW;
+                    } else if (v > .985) {
+                        blocks[x][y][z] = VoxelType.ICE;
+                    } else {
+                        blocks[x][y][z] = VoxelType.ICE_GRASS;
+                        blocks[x][y+1][z] = VoxelType.SNOW;
+                        generateWinterFoliage(blocks, x, y, z);
+                    }
+                } else {
+                    // high top layer
+                    blocks[x][y][z] = VoxelType.ICE_GRASS;
+                    blocks[x][y+1][z] = VoxelType.SNOW;
+                    generateWinterFoliage(blocks, x, y, z);
+                }
+            } else {
+                blocks[x][y][z] = VoxelType.DIRT;
+            }
+        }
+    }
+    
+    private void generateCellOceanBiome(Chunk chunk, VoxelType[][][] blocks, int x, int y, int z, int cellHeight, int rockyCutoff) {
+        int noiseX = x + chunk.i * CHUNK_S;
+        int noiseZ = z + chunk.j * CHUNK_S;
+        double v = getNoise2d(noiseGenBlockType, noiseX, noiseZ);
+        if (v > 0.45) {
+            blocks[x][y][z] = VoxelType.SAND;
+            if (y == cellHeight) {
+                generateWetSandFoliage(blocks, x, y, z); 
+            }
+        } else {
+            if (y == cellHeight) {
+                blocks[x][y][z] = VoxelType.WATER;
+            } else {
+                blocks[x][y][z] = VoxelType.DIRT;
+            }
+        }
+    }
+    
+    private void generateCellDesertBiome(Chunk chunk, VoxelType[][][] blocks, int x, int y, int z, int cellHeight, int rockyCutoff) {
+        blocks[x][y][z] = VoxelType.SAND;
+        if (y == cellHeight) {
+            generateDesertFoliage(blocks, x, y, z);
+        }
+    }
+    
+    private void generateOreVein(VoxelType[][][] blocks, int x, int y, int z, VoxelType v) {
+        int length = rand.nextInt(ORE_VEIN_MAX - ORE_VEIN_MIN + 1) + ORE_VEIN_MIN;
         int[] coords = new int[length * 3];
         
         // add starting position
@@ -198,20 +349,16 @@ public class WorldGenerator {
             int pz = coords[i - 1];
             
             double val = rand.nextDouble();
-            if (val < 0.16666)
+            if (val < 0.2)
                 px += 1;
-            else if (val < 0.3333)
+            else if (val < 0.4)
                 px -= 1;
-            else if (val < 0.3333)
-                px -= 1;
-            else if (val < 0.5)
-                py += 1;
-            else if (val < 0.6666)
-                py -= 1;
-            else if (val < 0.75)
+            else if (val < 0.6)
                 pz += 1;
-            else if (val < 0.9166)
+            else if (val < 0.8)
                 pz -= 1;
+            else if (val < 1.0)
+                py -= 1;
             
             coords[i] = px;
             coords[i + 1] = py;
@@ -221,7 +368,7 @@ public class WorldGenerator {
         addBlocksSafe(blocks, coords, v);
     }
     
-    private void geterateFoliage(VoxelType[][][] blocks, int x, int y, int z) {
+    private void geterateGrassFoliage(VoxelType[][][] blocks, int x, int y, int z) {
         if (rand.nextDouble() < 0.05) 
             blocks[x][y+1][z] = VoxelType.TALL_GRASS;
         if (rand.nextDouble() < 0.0040)
@@ -356,7 +503,7 @@ public class WorldGenerator {
         }
     }
     
-    public List<Runnable> newChunkPosition(int i, int j, Screen s) {
+    public List<Runnable> generateNewChunksIfNeeded(int i, int j, Screen s) {
         List<Runnable> newTasks = new ArrayList<>();
         List<Chunk> newChunks = new ArrayList<>();
 
@@ -397,5 +544,9 @@ public class WorldGenerator {
         });
 
         return newTasks;
+    }
+    
+    public void incrementChunkGenBoundary(int inc) {
+        CHUNK_GENERATION_BOUNDARY += inc;
     }
 }

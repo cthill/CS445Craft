@@ -22,8 +22,8 @@ import static org.lwjgl.opengl.GL11.*;
 import static org.lwjgl.opengl.GL15.*;
 
 public class Chunk extends Drawable {
-    public static final int CHUNK_S = 30;
-    public static final int CHUNK_H = 60;
+    public static final int CHUNK_S = 16;
+    public static final int CHUNK_H = 90;
     public static final int NUM_BLOCKS = CHUNK_S * CHUNK_H * CHUNK_S;
     
     private World world;

@@ -16,6 +16,7 @@ public class Game {
     public static final int RES_HEIGHT = 768;
     
     // game constants
+    private static int CHUNK_GENERATION_BOUNDARY = 5;
     private static final int INITIAL_WORLD_SIZE = 7;
     private static final boolean DYNAMIC_WORLD_GENERATION = true;
     private static final float MOUSE_SENS = 0.09f;
@@ -121,7 +122,7 @@ public class Game {
         }
 
         if (chunkPositionUpdated && DYNAMIC_WORLD_GENERATION) {
-            List<Runnable> chunkGenerationTasks = worldGen.generateNewChunksIfNeeded(chunkI, chunkJ, screen);
+            List<Runnable> chunkGenerationTasks = worldGen.generateNewChunksIfNeeded(chunkI, chunkJ, CHUNK_GENERATION_BOUNDARY, screen);
             taskQueue.addTasks(chunkGenerationTasks);
         }
     }
@@ -189,7 +190,7 @@ public class Game {
             if (!lastUpState) {
                 lastUpState = true;
                 screen.incDrawDist(Chunk.CHUNK_S * Voxel.BLOCK_SIZE);
-                worldGen.incrementChunkGenBoundary(1);
+                CHUNK_GENERATION_BOUNDARY++;
             }
         } else {
             lastUpState = false;
@@ -199,7 +200,7 @@ public class Game {
             if (!lastDownState) {
                 lastDownState = true;
                 screen.incDrawDist(-Chunk.CHUNK_S * Voxel.BLOCK_SIZE);
-                worldGen.incrementChunkGenBoundary(-1);
+                CHUNK_GENERATION_BOUNDARY--;
             }
         } else {
             lastDownState = false;

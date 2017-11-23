@@ -16,14 +16,15 @@ import java.util.List;
 import java.util.Random;
 import java.util.Set;
 
+import java.lang.management.ThreadMXBean;
+import java.lang.management.ManagementFactory;
+
 /**
  *
  * @author cthill
  */
 public class WorldGenerator {
     // generator constants
-    private static int CHUNK_GENERATION_BOUNDARY = 3;
-    private static final int FOLIAGE_HEADROOM = 8; // headroom for foliage generation on top of world
     private static final int WORLD_HEADROOM = 15; // headroom for player building on top of world
     private static final int BEDROCK_HEIGHT = 1;
     private static final int ROCK_LAYER_HEIGHT = (Chunk.CHUNK_H - WORLD_HEADROOM) / 2;
@@ -134,20 +135,20 @@ public class WorldGenerator {
                 }
                         
                 int cellHeight = BEDROCK_HEIGHT + ROCK_LAYER_HEIGHT + heightDelta;
-                if (cellHeight > CHUNK_H - 1 - FOLIAGE_HEADROOM - WORLD_HEADROOM) {
-                    cellHeight = CHUNK_H - 1 - FOLIAGE_HEADROOM - WORLD_HEADROOM;
+                if (cellHeight > CHUNK_H - 1 - WORLD_HEADROOM) {
+                    cellHeight = CHUNK_H - 1 - WORLD_HEADROOM;
                 }
                 
                 cellHeights[x][z] = cellHeight;
                 
                 double biomeNoise = Math.abs(getNoise2d(noiseGenBiome, noiseX, noiseZ)) * 3;
-                if (Math.abs(localHeightNoise) < 1 && Math.abs(regionHeightNoise) < 1 && Math.abs(combinedHeightNoise) < 3) {
+                if (Math.abs(localHeightNoise) < 2 && Math.abs(regionHeightNoise) < 2 && Math.abs(combinedHeightNoise) < 2) {
                     // very low region, generate desert or ocean
                     if (biomeNoise > 0.10) {
-                        cellHeights[x][z] = BEDROCK_HEIGHT + ROCK_LAYER_HEIGHT + 2;
+                        cellHeights[x][z] = BEDROCK_HEIGHT + ROCK_LAYER_HEIGHT + 1;
                         biomes[x][z] = Biome.OCEAN;
                     } else {
-                        int cnh = (int) (combinedHeightNoise * 1.5);
+                        int cnh = (int) (combinedHeightNoise * 2);
                         if (cnh < 2) {
                             cnh = 2;
                         }
@@ -503,50 +504,50 @@ public class WorldGenerator {
         }
     }
     
-    public List<Runnable> generateNewChunksIfNeeded(int i, int j, Screen s) {
+    public List<Runnable> generateNewChunksIfNeeded(int i, int j, int distance, Screen s) {
         List<Runnable> newTasks = new ArrayList<>();
         List<Chunk> newChunks = new ArrayList<>();
-
-        for (int di = -CHUNK_GENERATION_BOUNDARY; di <= CHUNK_GENERATION_BOUNDARY; di++) {
-            for (int dj = -CHUNK_GENERATION_BOUNDARY; dj <= CHUNK_GENERATION_BOUNDARY; dj++) {
-                final int indexI = i + di;
-                final int indexJ = j + dj;
-                
-                if (world.getChunk(indexI, indexJ) == null) {
-                    Chunk c = createChunk(indexI, indexJ);
-                    newChunks.add(c);
-                    world.addChunk(c);
-                    
-                    // generate the chunk later
-                    newTasks.add((Runnable) () -> {
-                        fillChunkGenerateRandom(c);
-                        //System.out.println("Generated new chunk " + indexI + " " + indexJ);
-                    });
-                }
+        for (int d = 1; d <= distance; d++) {
+            for (int di = -d; di <= d; di++) {
+                addChunkGenerationTask(i + di, j + d, newTasks, newChunks);
+                addChunkGenerationTask(i + di, j - d, newTasks, newChunks);
             }
-        }
+            for (int dj = -d; dj <= d; dj++) {
+                addChunkGenerationTask(i + d, j + dj, newTasks, newChunks);
+                addChunkGenerationTask(i - d, j + dj, newTasks, newChunks);
+            }
+        
+            Set<Chunk> newAndAdjacentChunks = new HashSet<>();
+            newAndAdjacentChunks.addAll(newChunks);
+            newChunks.forEach(chunk -> newAndAdjacentChunks.addAll(world.findAllAdjacentChunks(chunk)));
 
-        Set<Chunk> newAndAdjacentChunks = new HashSet<>();
-        newAndAdjacentChunks.addAll(newChunks);
-        newChunks.forEach(chunk -> newAndAdjacentChunks.addAll(world.findAllAdjacentChunks(chunk)));
-        
-        // sort the chunks so the closest ones are built first
-        List<Chunk> newAndAdjacentChunksSorted = new ArrayList<>(newAndAdjacentChunks);
-        newAndAdjacentChunksSorted.sort(Comparator.comparing(object -> ((Chunk) object).gridDistanceTo(i, j)));
-        
-        // add tasks to asynchronously rebuild the meshes
-        newAndAdjacentChunksSorted.forEach(chunk -> {
-            newTasks.add((Runnable) () -> {
-                chunk.rebuildMesh();
-                s.addObject(chunk);
-                //System.out.println("rebuilt chunk " + chunk.i + " " + chunk.j);
+            // add tasks to asynchronously rebuild the meshes
+            newAndAdjacentChunks.forEach(chunk -> {
+                newTasks.add((Runnable) () -> {
+                    ThreadMXBean threadTimer = ManagementFactory.getThreadMXBean();
+                    long start = threadTimer.getCurrentThreadCpuTime();
+                    chunk.rebuildMesh();
+                    System.out.println("Built " + chunk.i + "," + chunk.j + " in " + (threadTimer.getCurrentThreadCpuTime() - start) / 1000000000.0);
+                    s.addObject(chunk);
+                });
             });
-        });
-
+        }
         return newTasks;
     }
     
-    public void incrementChunkGenBoundary(int inc) {
-        CHUNK_GENERATION_BOUNDARY += inc;
+    private void addChunkGenerationTask(int i, int j, List<Runnable> newTasks, List<Chunk> newChunks) {
+        if (world.getChunk(i, j) == null) {
+            Chunk c = createChunk(i, j);
+            newChunks.add(c);
+            world.addChunk(c);
+
+            // generate the chunk later
+            newTasks.add((Runnable) () -> {
+                ThreadMXBean threadTimer = ManagementFactory.getThreadMXBean();
+                long start = threadTimer.getCurrentThreadCpuTime();
+                fillChunkGenerateRandom(c);
+                System.out.println("Generated " + i + "," + j + " in " + (threadTimer.getCurrentThreadCpuTime() - start) / 1000000000.0);
+            });
+        }
     }
 }

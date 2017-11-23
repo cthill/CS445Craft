@@ -235,9 +235,6 @@ public class Chunk extends Drawable {
         int writeIndexTextureTranslucent = 0;
         float[] positionDataTranslucent = new float[NUM_BLOCKS * 6 * floatsPerFacePosition];
         float[] textureDataTranslucent = new float[NUM_BLOCKS * 6 * floatsPerFaceTexture];
-
-//        int totalFaces = 0;
-//        int totalFacesTranslucent = 0;
         
         for (int x = 0; x < CHUNK_S; x++) {
             for (int z = 0; z < CHUNK_S; z++) {
@@ -268,13 +265,13 @@ public class Chunk extends Drawable {
                         
                         // compute faces that can not be seen
                         faceVisible = new boolean[] {
-                             above == null || (!translucentTexture && Voxel.isSeeTrough(above)) || partiallyTransparent,
-                            // the extra && y > 0 is here so we don't draw the bottom faces of the world's bottom voxels
-                            (below == null || (!translucentTexture && Voxel.isSeeTrough(below)) || partiallyTransparent) && y > 0,
-                             front == null || (!translucentTexture && Voxel.isSeeTrough(front)) || partiallyTransparent,
-                             back  == null || (!translucentTexture && Voxel.isSeeTrough(back))  || partiallyTransparent,
-                             left  == null || (!translucentTexture && Voxel.isSeeTrough(left))  || partiallyTransparent,
-                             right == null || (!translucentTexture && Voxel.isSeeTrough(right)) || partiallyTransparent 
+                            shouldDrawFace(voxelType, above),
+                            //the extra && y > 0 is here so we don't draw the bottom faces of the world's bottom voxels
+                            shouldDrawFace(voxelType, below) && y > 0,
+                            shouldDrawFace(voxelType, front),
+                            shouldDrawFace(voxelType, back),
+                            shouldDrawFace(voxelType, left),
+                            shouldDrawFace(voxelType, right)
                         };
                     }
                     
@@ -334,6 +331,22 @@ public class Chunk extends Drawable {
         glBindBuffer(GL_ARRAY_BUFFER, VBOTextureHandleTranslucent);
         glBufferData(GL_ARRAY_BUFFER, VertexTextureTranslucent, GL_STATIC_DRAW);
         glBindBuffer(GL_ARRAY_BUFFER, 0);
+    }
+    
+    private boolean shouldDrawFace(VoxelType v, VoxelType adjacent) {
+        if (adjacent == null) {
+            return true;
+        }
+        
+        if (Voxel.isPartiallyTransparent(v) || Voxel.isPartiallyTransparent(adjacent)) {
+            return true;
+        }
+        
+        if (Voxel.isTranslucent(adjacent) && v != adjacent) {
+            return true;
+        }
+        
+        return false;
     }
     
     public VoxelType lookupTraverseChunks(int x, int y, int z) {

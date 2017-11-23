@@ -15,11 +15,13 @@
 package cs445craft;
 
 import java.awt.Font;
+import java.nio.FloatBuffer;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Comparator;
 import java.util.List;
 import java.util.stream.Collectors;
+import org.lwjgl.BufferUtils;
 import org.lwjgl.LWJGLException;
 import org.lwjgl.opengl.Display;
 import org.lwjgl.opengl.DisplayMode;
@@ -103,6 +105,7 @@ public class Screen {
     
     private void render3D() {
         // setup 3d config
+        glShadeModel(GL_SMOOTH);
         glEnable(GL_DEPTH_TEST);
         glEnable(GL_CULL_FACE);
         glDisable(GL_BLEND);
@@ -129,6 +132,11 @@ public class Screen {
             }
         }
         glDisable(GL_ALPHA_TEST);
+        glLightModeli(GL_LIGHT_MODEL_LOCAL_VIEWER, GL_TRUE);
+        glEnable(GL_LIGHTING);
+        glEnable(GL_LIGHT0);
+        glLightModel(GL_LIGHT_MODEL_AMBIENT, asFloatBuffer(new float[]{1.0f, 1.0f, 1.0f, 1f}));
+        glLight(GL_LIGHT0, GL_POSITION, asFloatBuffer(new float[]{0f, 0f, 0f, 1f}));
         
         // 3d draw translucent objects
         glEnable(GL_BLEND);
@@ -149,6 +157,8 @@ public class Screen {
     }
     
     private void render2D() {
+        // smooth shading
+        
         // switch to 2d mode for hud draw
         glMatrixMode(GL_PROJECTION);
         glLoadIdentity();
@@ -178,6 +188,7 @@ public class Screen {
         glEnd();
         glPopMatrix();
         
+        
 //        font = new TrueTypeFont(awtFont, false);
 //        font.drawString(0,0, "TESTING", Color.yellow);
         
@@ -205,5 +216,12 @@ public class Screen {
     **/
     public void close() {
         Display.destroy();
+    }
+    
+    private FloatBuffer asFloatBuffer(float[] values) {
+        FloatBuffer buffer = BufferUtils.createFloatBuffer(values.length);
+        buffer.put(values);
+        buffer.flip();
+        return buffer;
     }
 }

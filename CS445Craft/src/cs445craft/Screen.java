@@ -105,6 +105,7 @@ public class Screen {
     
     private void render3D() {
         // setup 3d config
+        glShadeModel(GL_SMOOTH);
         glEnable(GL_DEPTH_TEST);
         glEnable(GL_CULL_FACE);
         glDisable(GL_BLEND);
@@ -131,6 +132,11 @@ public class Screen {
             }
         }
         glDisable(GL_ALPHA_TEST);
+        glLightModeli(GL_LIGHT_MODEL_LOCAL_VIEWER, GL_TRUE);
+        glEnable(GL_LIGHTING);
+        glEnable(GL_LIGHT0);
+        glLightModel(GL_LIGHT_MODEL_AMBIENT, asFloatBuffer(new float[]{1.0f, 1.0f, 1.0f, 1f}));
+        glLight(GL_LIGHT0, GL_POSITION, asFloatBuffer(new float[]{0f, 0f, 0f, 1f}));
         
         // 3d draw translucent objects
         glEnable(GL_BLEND);
@@ -152,7 +158,7 @@ public class Screen {
     
     private void render2D() {
         // smooth shading
-        glShadeModel(GL_SMOOTH);
+        
         // switch to 2d mode for hud draw
         glMatrixMode(GL_PROJECTION);
         glLoadIdentity();
@@ -182,11 +188,6 @@ public class Screen {
         glEnd();
         glPopMatrix();
         
-        glLightModeli(GL_LIGHT_MODEL_LOCAL_VIEWER, GL_TRUE);
-        glEnable(GL_LIGHTING);
-        glEnable(GL_LIGHT0);
-        glLightModel(GL_LIGHT_MODEL_AMBIENT, asFloatBuffer(new float[]{0.05f, 0.05f, 0.05f, 1f}));
-        glLight(GL_LIGHT0, GL_DIFFUSE, asFloatBuffer(new float[]{1.5f, 1.5f, 1.5f, 1}));
         
 //        font = new TrueTypeFont(awtFont, false);
 //        font.drawString(0,0, "TESTING", Color.yellow);

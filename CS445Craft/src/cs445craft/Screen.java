@@ -136,7 +136,8 @@ public class Screen {
         glEnable(GL_LIGHTING);
         glEnable(GL_LIGHT0);
         glLightModel(GL_LIGHT_MODEL_AMBIENT, asFloatBuffer(new float[]{1.0f, 1.0f, 1.0f, 1f}));
-        glLight(GL_LIGHT0, GL_POSITION, asFloatBuffer(new float[]{0f, 0f, 0f, 1f}));
+        glLight(GL_LIGHT0, GL_DIFFUSE, asFloatBuffer(new float[]{25f,25f,25f,1}));
+        glLight(GL_LIGHT0, GL_POSITION, asFloatBuffer(new float[]{0f, 0f, 200f, 2f}));        
         
         // 3d draw translucent objects
         glEnable(GL_BLEND);

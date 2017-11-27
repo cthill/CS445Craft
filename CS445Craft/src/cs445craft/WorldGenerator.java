@@ -10,11 +10,8 @@ import static cs445craft.Chunk.CHUNK_H;
 import static cs445craft.Chunk.CHUNK_S;
 import java.util.ArrayList;
 import java.util.Arrays;
-import java.util.Comparator;
-import java.util.HashSet;
 import java.util.List;
 import java.util.Random;
-import java.util.Set;
 
 import java.lang.management.ThreadMXBean;
 import java.lang.management.ManagementFactory;
@@ -43,9 +40,7 @@ public class WorldGenerator {
     private static final int NOISE_FACTOR_HEIGHT = 10;
     private static final int NOISE_FACTOR_LOCAL_HEIGHT = 2;
     private static final int NOISE_FACTOR_REGION_HEIGHT = 14;
-            
-            
-    private final int seed;
+
     private final int initialSize;
     private final Random rand;
     
@@ -64,7 +59,6 @@ public class WorldGenerator {
     }
     
     public WorldGenerator(int seed, int initialSize) {
-        this.seed = seed;
         this.initialSize = initialSize;
         this.rand = new Random();
         
@@ -91,7 +85,12 @@ public class WorldGenerator {
         }
         
         // rebuild all the meshes
-        world.getChunks().forEach(chunk -> chunk.rebuildMesh());
+        world.getChunks().forEach(chunk -> {
+            chunk.init();
+            chunk.rebuildMesh();
+            chunk.setInitialized();
+            chunk.setDirty(false);
+        });
         
         return world;
     }
@@ -109,6 +108,9 @@ public class WorldGenerator {
     }
     
     private void fillChunkGenerateRandom(Chunk chunk) {
+        ThreadMXBean threadTimer = ManagementFactory.getThreadMXBean();
+        long start = threadTimer.getCurrentThreadCpuTime();
+        
         VoxelType[][][] blocks = new VoxelType[CHUNK_S][CHUNK_H][CHUNK_S];
         
         // generate heights for each xz position
@@ -117,11 +119,11 @@ public class WorldGenerator {
 
         for (int x = 0; x < CHUNK_S; x++) {
             for (int z = 0; z < CHUNK_S; z++) {
-                int noiseX = x + chunk.i * CHUNK_S;
-                int noiseZ = z + chunk.j * CHUNK_S;
+                int noiseX = x + chunk.indexI * CHUNK_S;
+                int noiseZ = z + chunk.indexJ * CHUNK_S;
                 
                 double localHeightNoise = getNoise2d(noiseGenLocalHeight, noiseX, noiseZ) * NOISE_FACTOR_LOCAL_HEIGHT;
-                double regionHeightNoise = 1 + getNoise2d(noiseGenRegionHeight, chunk.i, chunk.j) * NOISE_FACTOR_REGION_HEIGHT;
+                double regionHeightNoise = 1 + getNoise2d(noiseGenRegionHeight, chunk.indexI, chunk.indexJ) * NOISE_FACTOR_REGION_HEIGHT;
                 
                 double combinedHeightNoise = Math.abs(NOISE_FACTOR_HEIGHT * localHeightNoise * regionHeightNoise);
 //                System.out.println(localHeightNoise + " " + regionHeightNoise + " " + combinedHeightNoise);                
@@ -178,6 +180,8 @@ public class WorldGenerator {
         }
         
         chunk.copyBlocks(blocks, 0, CHUNK_S, 0, CHUNK_H, 0, CHUNK_S);
+        chunk.setGenerated(true);
+        System.out.println("Generated " + chunk.indexI + "," + chunk.indexJ + " in " + (threadTimer.getCurrentThreadCpuTime() - start) / 1000000000.0);
     }
     
     private void generateFlatLayer(VoxelType[][][] blocks, int y, VoxelType type) {
@@ -195,8 +199,8 @@ public class WorldGenerator {
     }
     
     private void generateRockLayerSingle(Chunk chunk, VoxelType[][][] blocks, int x, int y, int z) {
-        int noiseX = x + chunk.i * CHUNK_S;
-        int noiseZ = z + chunk.j * CHUNK_S;
+        int noiseX = x + chunk.indexI * CHUNK_S;
+        int noiseZ = z + chunk.indexJ * CHUNK_S;
         double noise = (getNoise3d(noiseGenCavern, noiseX, y, noiseZ) + 1) / 2;
         boolean openSpace = (noise < 0.475);
 
@@ -251,8 +255,8 @@ public class WorldGenerator {
     
     private void generateCellNormalBiome(Chunk chunk, VoxelType[][][] blocks, int x, int y, int z, int cellHeight, int rockyCutoff) {
         boolean openSpace = false;
-        int noiseX = x + chunk.i * CHUNK_S;
-        int noiseZ = z + chunk.j * CHUNK_S;
+        int noiseX = x + chunk.indexI * CHUNK_S;
+        int noiseZ = z + chunk.indexJ * CHUNK_S;
         double noise = (getNoise3d(noiseGenCavern, noiseX, y, noiseZ) + 1) / 2;
         if (y == cellHeight) {
             openSpace = (noise < 0.4525);
@@ -273,8 +277,8 @@ public class WorldGenerator {
     
     private void generateCellWinterBiome(Chunk chunk, VoxelType[][][] blocks, int x, int y, int z, int cellHeight, int rockyCutoff) {
         boolean openSpace = false;
-        int noiseX = x + chunk.i * CHUNK_S;
-        int noiseZ = z + chunk.j * CHUNK_S;
+        int noiseX = x + chunk.indexI * CHUNK_S;
+        int noiseZ = z + chunk.indexJ * CHUNK_S;
         double noise = (getNoise3d(noiseGenCavern, noiseX, y, noiseZ) + 1) / 2;
         if (y == cellHeight) {
             openSpace = (noise < 0.4525);
@@ -311,8 +315,8 @@ public class WorldGenerator {
     }
     
     private void generateCellOceanBiome(Chunk chunk, VoxelType[][][] blocks, int x, int y, int z, int cellHeight, int rockyCutoff) {
-        int noiseX = x + chunk.i * CHUNK_S;
-        int noiseZ = z + chunk.j * CHUNK_S;
+        int noiseX = x + chunk.indexI * CHUNK_S;
+        int noiseZ = z + chunk.indexJ * CHUNK_S;
         double v = getNoise2d(noiseGenBlockType, noiseX, noiseZ);
         if (v > 0.45) {
             blocks[x][y][z] = VoxelType.SAND;
@@ -504,49 +508,39 @@ public class WorldGenerator {
         }
     }
     
-    public List<Runnable> generateNewChunksIfNeeded(int i, int j, int distance, Screen s) {
+    public List<Runnable> generateNewChunksIfNeeded(int i, int j, int distance, Screen screen) {
         List<Runnable> newTasks = new ArrayList<>();
         List<Chunk> newChunks = new ArrayList<>();
         for (int d = 1; d <= distance; d++) {
             for (int di = -d; di <= d; di++) {
-                addChunkGenerationTask(i + di, j + d, newTasks, newChunks);
-                addChunkGenerationTask(i + di, j - d, newTasks, newChunks);
+                addChunkGenerationTask(i + di, j + d, newTasks, newChunks, screen);
+                addChunkGenerationTask(i + di, j - d, newTasks, newChunks, screen);
             }
             for (int dj = -d; dj <= d; dj++) {
-                addChunkGenerationTask(i + d, j + dj, newTasks, newChunks);
-                addChunkGenerationTask(i - d, j + dj, newTasks, newChunks);
-            }
-        
-            Set<Chunk> newAndAdjacentChunks = new HashSet<>();
-            newAndAdjacentChunks.addAll(newChunks);
-            newChunks.forEach(chunk -> newAndAdjacentChunks.addAll(world.findAllAdjacentChunks(chunk)));
-
-            // add tasks to asynchronously rebuild the meshes
-            newAndAdjacentChunks.forEach(chunk -> {
-                newTasks.add((Runnable) () -> {
-                    ThreadMXBean threadTimer = ManagementFactory.getThreadMXBean();
-                    long start = threadTimer.getCurrentThreadCpuTime();
-                    chunk.rebuildMesh();
-                    System.out.println("Built " + chunk.i + "," + chunk.j + " in " + (threadTimer.getCurrentThreadCpuTime() - start) / 1000000000.0);
-                    s.addObject(chunk);
-                });
-            });
+                addChunkGenerationTask(i + d, j + dj, newTasks, newChunks, screen);
+                addChunkGenerationTask(i - d, j + dj, newTasks, newChunks, screen);
+            }            
         }
+        
+        newChunks.forEach(chunk -> {
+            // make sure adjacent chunks are rebuilt
+            world.findAllAdjacentChunks(chunk).forEach(adjChunk -> {
+                adjChunk.setDirty(true);
+            });
+        });
         return newTasks;
     }
     
-    private void addChunkGenerationTask(int i, int j, List<Runnable> newTasks, List<Chunk> newChunks) {
+    private void addChunkGenerationTask(int i, int j, List<Runnable> newTasks, List<Chunk> newChunks, Screen screen) {
         if (world.getChunk(i, j) == null) {
             Chunk c = createChunk(i, j);
             newChunks.add(c);
             world.addChunk(c);
-
+            screen.addObject(c);
+            
             // generate the chunk later
             newTasks.add((Runnable) () -> {
-                ThreadMXBean threadTimer = ManagementFactory.getThreadMXBean();
-                long start = threadTimer.getCurrentThreadCpuTime();
                 fillChunkGenerateRandom(c);
-                System.out.println("Generated " + i + "," + j + " in " + (threadTimer.getCurrentThreadCpuTime() - start) / 1000000000.0);
             });
         }
     }

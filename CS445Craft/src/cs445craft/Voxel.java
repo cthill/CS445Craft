@@ -11,6 +11,14 @@ package cs445craft;
  */
 public class Voxel {
     public static final int BLOCK_SIZE = 2;
+    
+    public static final int FACE_TOP = 0;
+    public static final int FACE_BOTTOM = 1;
+    public static final int FACE_FRONT = 2;
+    public static final int FACE_BACK = 3;
+    public static final int FACE_LEFT = 4;
+    public static final int FACE_RIGHT = 5;
+    
     public static enum VoxelType {
         GRASS,
         SAND,
@@ -107,6 +115,472 @@ public class Voxel {
         );
     }
     
+    public static boolean breakIfSupportRemoved(VoxelType v) {
+        return (
+            v == VoxelType.RED_FLOWER ||
+            v == VoxelType.YELLOW_FLOWER ||
+            v == VoxelType.RED_MUSHROOM ||
+            v == VoxelType.MUSHROOM ||
+            v == VoxelType.TALL_GRASS ||
+            v == VoxelType.REED ||
+            v == VoxelType.CACTUS ||
+            v == VoxelType.SNOW
+        );
+    }
+    
+    
+    public static void writeFaceVertices(float[] data, int writeIndex, int face, float brightness, VoxelType voxelType, int x, int y, int z) {
+        if (isCrossType(voxelType)) {
+            writeFaceVerticesCross(data, writeIndex, face, brightness, voxelType, x, y, z);
+        } else {
+            writeFaceVerticesCube(data, writeIndex, face, brightness, voxelType, x, y, z);
+        }
+    }
+    
+    private static void writeFaceVerticesCross(float[] data, int writeIndex, int face, float brightness, VoxelType voxelType, int x, int y, int z) {
+        float blockX = (float) (x * Voxel.BLOCK_SIZE);
+        float blockY = (float) (y * Voxel.BLOCK_SIZE);
+        float blockZ = (float) (z * Voxel.BLOCK_SIZE);
+        
+        float[] vertices;
+        switch (face) {
+            case FACE_FRONT:
+                vertices = getFrontFaceCross(brightness, voxelType, blockX, blockY, blockZ);
+                break;
+            case FACE_BACK:
+                vertices = getBackFaceCross(brightness, voxelType, blockX, blockY, blockZ);
+                break;
+            case FACE_LEFT:
+                vertices = getLeftFaceCross(brightness, voxelType, blockX, blockY, blockZ);
+                break;
+            case FACE_RIGHT:
+                vertices = getRightFaceCross(brightness, voxelType, blockX, blockY, blockZ);
+                break;
+            default:
+                throw new RuntimeException("Unknown face");
+        }
+        
+        System.arraycopy(vertices, 0, data, writeIndex, vertices.length);
+    }
+    
+    private static void writeFaceVerticesCube(float[] data, int writeIndex, int face, float brightness, VoxelType voxelType, int x, int y, int z) {
+        float blockX = (float) (x * Voxel.BLOCK_SIZE);
+        float blockY = (float) (y * Voxel.BLOCK_SIZE);
+        float blockZ = (float) (z * Voxel.BLOCK_SIZE);
+        
+        float[] vertices;
+        switch (face) {
+            case FACE_TOP:
+                vertices = getTopFace(brightness, voxelType, blockX, blockY, blockZ);
+                break;
+            case FACE_BOTTOM:
+                vertices = getBottomFace(brightness, voxelType, blockX, blockY, blockZ);
+                break;
+            case FACE_FRONT:
+                vertices = getFrontFace(brightness, voxelType, blockX, blockY, blockZ);
+                break;
+            case FACE_BACK:
+                vertices = getBackFace(brightness, voxelType, blockX, blockY, blockZ);
+                break;
+            case FACE_LEFT:
+                vertices = getLeftFace(brightness, voxelType, blockX, blockY, blockZ);
+                break;
+            case FACE_RIGHT:
+                vertices = getRightFace(brightness, voxelType, blockX, blockY, blockZ);
+                break;
+            default:
+                throw new RuntimeException("Unknown face");
+        }
+        
+        System.arraycopy(vertices, 0, data, writeIndex, vertices.length);
+    }
+    
+    private static float[] getTopFace(float lightness, VoxelType voxelType, float x, float y, float z) {
+        float s = ((float) Voxel.BLOCK_SIZE) / 2;
+        
+        float e = 0.0f; //extra side offset (for things like cacti)
+        float h = 0.0f; //extra top offset (for things like torches or snow)
+        if (voxelType == VoxelType.CACTUS) {
+            e = 0.125f;
+        } else if (voxelType == VoxelType.SNOW) {
+            h = Voxel.BLOCK_SIZE - 0.15f;
+        }
+        
+        float offset = (2048f/16)/2048f;
+        int[] t = getTextureCoords(voxelType);
+        
+        // vertex, normal, texture, color
+        return new float[] {
+            // position
+            // normal
+            // color
+            // texture
+
+            x + s, y + s - h, z + s,
+            lightness, lightness, lightness,
+            offset*(t[0] + 1), offset*(t[1] + 1),
+            
+            x - s, y + s - h, z + s,
+            lightness, lightness, lightness,
+            offset*(t[0] + 0), offset*(t[1] + 1),
+            
+            x - s, y + s - h, z - s,
+            lightness, lightness, lightness,
+            offset*(t[0] + 0), offset*(t[1] + 0),
+            
+            x + s, y + s - h, z - s,
+            lightness, lightness, lightness,
+            offset*(t[0] + 1), offset*(t[1] + 0)
+        };
+    }
+    
+    private static float[] getBottomFace(float lightness, VoxelType voxelType, float x, float y, float z) {
+        float s = ((float) Voxel.BLOCK_SIZE) / 2;
+        
+        float e = 0.0f; //extra side offset (for things like cacti)
+        float h = 0.0f; //extra top offset (for things like torches or snow)
+        if (voxelType == VoxelType.CACTUS) {
+            e = 0.125f;
+        } else if (voxelType == VoxelType.SNOW) {
+            h = Voxel.BLOCK_SIZE - 0.15f;
+        }
+        
+        float offset = (2048f/16)/2048f;
+        int[] t = getTextureCoords(voxelType);
+        
+        
+        // vertex, normal, texture, color
+        return new float[] {
+            // position
+            // normal
+            // texture
+
+            x + s, y - s, z - s,
+            lightness, lightness, lightness,
+            offset*(t[2] + 1), offset*(t[3] + 1),
+            
+            x - s, y - s, z - s,
+            lightness, lightness, lightness,
+            offset*(t[2] + 0), offset*(t[3] + 1),
+            
+            x - s, y - s, z + s,
+            lightness, lightness, lightness,
+            offset*(t[2] + 0), offset*(t[3] + 0),
+            
+            x + s, y - s, z + s,
+            lightness, lightness, lightness,
+            offset*(t[2] + 1), offset*(t[3] + 0),
+        };
+    }
+    
+    private static float[] getFrontFace(float lightness, VoxelType voxelType, float x, float y, float z) {
+        float s = ((float) Voxel.BLOCK_SIZE) / 2;
+        
+        float e = 0.0f; //extra side offset (for things like cacti)
+        float h = 0.0f; //extra top offset (for things like torches or snow)
+        if (voxelType == VoxelType.CACTUS) {
+            e = 0.125f;
+        } else if (voxelType == VoxelType.SNOW) {
+            h = Voxel.BLOCK_SIZE - 0.15f;
+        }
+        
+        float offset = (2048f/16)/2048f;
+        int[] t = getTextureCoords(voxelType);
+        
+        
+        // vertex, normal, texture, color
+        return new float[] {
+            // position
+            // normal
+            // texture
+            x + s, y + s - h, z - s + e,
+            lightness, lightness, lightness,
+            offset*(t[4] + 0), offset*(t[5] + 0),
+            
+            x - s, y + s - h, z - s + e,
+            lightness, lightness, lightness,
+            offset*(t[4] + 1), offset*(t[5] + 0),
+            
+            x - s, y - s, z - s + e,
+            lightness, lightness, lightness,
+            offset*(t[4] + 1), offset*(t[5] + 1),
+            
+            x + s, y - s, z - s + e,
+            lightness, lightness, lightness,
+            offset*(t[4] + 0), offset*(t[5] + 1),
+        };
+    }
+    
+    private static float[] getBackFace(float lightness, VoxelType voxelType, float x, float y, float z) {
+        float s = ((float) Voxel.BLOCK_SIZE) / 2;
+        
+        float e = 0.0f; //extra side offset (for things like cacti)
+        float h = 0.0f; //extra top offset (for things like torches or snow)
+        if (voxelType == VoxelType.CACTUS) {
+            e = 0.125f;
+        } else if (voxelType == VoxelType.SNOW) {
+            h = Voxel.BLOCK_SIZE - 0.15f;
+        }
+        
+        float offset = (2048f/16)/2048f;
+        int[] t = getTextureCoords(voxelType);
+        
+        
+        // vertex, normal, texture, color
+        return new float[] {
+            // position
+            // normal
+            // texture
+
+            x + s, y - s, z + s - e,
+            lightness, lightness, lightness,
+            offset*(t[6] + 1), offset*(t[7] + 1),
+            
+            x - s, y - s, z + s - e,
+            lightness, lightness, lightness,
+            offset*(t[6] + 0), offset*(t[7] + 1),
+            
+            x - s, y + s - h, z + s - e,
+            lightness, lightness, lightness,
+            offset*(t[6] + 0), offset*(t[7] + 0),
+            
+            x + s, y + s - h, z + s - e,
+            lightness, lightness, lightness,
+            offset*(t[6] + 1), offset*(t[7] + 0)
+        };
+    }
+    
+    private static float[] getLeftFace(float lightness, VoxelType voxelType, float x, float y, float z) {
+        float s = ((float) Voxel.BLOCK_SIZE) / 2;
+        
+        float e = 0.0f; //extra side offset (for things like cacti)
+        float h = 0.0f; //extra top offset (for things like torches or snow)
+        if (voxelType == VoxelType.CACTUS) {
+            e = 0.125f;
+        } else if (voxelType == VoxelType.SNOW) {
+            h = Voxel.BLOCK_SIZE - 0.15f;
+        }
+        
+        float offset = (2048f/16)/2048f;
+        int[] t = getTextureCoords(voxelType);
+        
+        
+        // vertex, normal, texture, color
+        return new float[] {
+            // position
+            // normal
+            // texture
+
+            x - s + e, y + s - h, z - s,
+            lightness, lightness, lightness,
+            offset*(t[8] + 0), offset*(t[9] + 0),
+            
+            x - s + e, y + s - h, z + s,
+            lightness, lightness, lightness,
+            offset*(t[8] + 1), offset*(t[9] + 0),
+            
+            x - s + e, y - s, z + s,
+            lightness, lightness, lightness,
+            offset*(t[8] + 1), offset*(t[9] + 1),
+            
+            x - s + e, y - s, z - s,
+            lightness, lightness, lightness,
+            offset*(t[8] + 0), offset*(t[9] + 1)
+        };
+    }
+    
+    private static float[] getRightFace(float lightness, VoxelType voxelType, float x, float y, float z) {
+        float s = ((float) Voxel.BLOCK_SIZE) / 2;
+        
+        float e = 0.0f; //extra side offset (for things like cacti)
+        float h = 0.0f; //extra top offset (for things like torches or snow)
+        if (voxelType == VoxelType.CACTUS) {
+            e = 0.125f;
+        } else if (voxelType == VoxelType.SNOW) {
+            h = Voxel.BLOCK_SIZE - 0.15f;
+        }
+        
+        float offset = (2048f/16)/2048f;
+        int[] t = getTextureCoords(voxelType);
+        
+        
+        // vertex, normal, texture, color
+        return new float[] {
+            // position
+            // normal
+            // texture
+
+            x + s - e, y + s - h, z + s,
+            lightness, lightness, lightness,
+            offset*(t[10] + 0), offset*(t[11] + 0),
+            
+            x + s - e, y + s - h, z - s,
+            lightness, lightness, lightness,
+            offset*(t[10] + 1), offset*(t[11] + 0),
+            
+            x + s - e, y - s, z - s,
+            lightness, lightness, lightness,
+            offset*(t[10] + 1), offset*(t[11] + 1),
+            
+            x + s - e, y - s, z + s,
+            lightness, lightness, lightness,
+            offset*(t[10] + 0), offset*(t[11] + 1)
+        };
+    }
+    
+    
+    
+    
+    private static float[] getFrontFaceCross(float lightness, VoxelType voxelType, float x, float y, float z) {
+        float s = ((float) Voxel.BLOCK_SIZE) / 2;
+
+        float offset = (2048f/16)/2048f;
+        int[] t = getTextureCoords(voxelType);
+        
+        
+        // vertex, normal, texture, color
+        return new float[] {
+            // position
+            // normal
+            // texture
+            x + s, y + s, z,
+            lightness, lightness, lightness,
+            offset*(t[4] + 0), offset*(t[5] + 0),
+            
+            x - s, y + s, z,
+            lightness, lightness, lightness,
+            offset*(t[4] + 1), offset*(t[5] + 0),
+            
+            x - s, y - s, z,
+            lightness, lightness, lightness,
+            offset*(t[4] + 1), offset*(t[5] + 1),
+            
+            x + s, y - s, z,
+            lightness, lightness, lightness,
+            offset*(t[4] + 0), offset*(t[5] + 1),
+        };
+    }
+    
+    private static float[] getBackFaceCross(float lightness, VoxelType voxelType, float x, float y, float z) {
+        float s = ((float) Voxel.BLOCK_SIZE) / 2;
+        
+        float e = 0.0f; //extra side offset (for things like cacti)
+        float h = 0.0f; //extra top offset (for things like torches or snow)
+        if (voxelType == VoxelType.CACTUS) {
+            e = 0.125f;
+        } else if (voxelType == VoxelType.SNOW) {
+            h = Voxel.BLOCK_SIZE - 0.15f;
+        }
+        
+        float offset = (2048f/16)/2048f;
+        int[] t = getTextureCoords(voxelType);
+        
+        
+        // vertex, normal, texture, color
+        return new float[] {
+            // position
+            // normal
+            // texture
+
+            x + s, y - s, z,
+            lightness, lightness, lightness,
+            offset*(t[6] + 1), offset*(t[7] + 1),
+            
+            x - s, y - s, z,
+            lightness, lightness, lightness,
+            offset*(t[6] + 0), offset*(t[7] + 1),
+            
+            x - s, y + s, z,
+            lightness, lightness, lightness,
+            offset*(t[6] + 0), offset*(t[7] + 0),
+            
+            x + s, y + s, z,
+            lightness, lightness, lightness,
+            offset*(t[6] + 1), offset*(t[7] + 0)
+        };
+    }
+    
+    private static float[] getLeftFaceCross(float lightness, VoxelType voxelType, float x, float y, float z) {
+        float s = ((float) Voxel.BLOCK_SIZE) / 2;
+        
+        float e = 0.0f; //extra side offset (for things like cacti)
+        float h = 0.0f; //extra top offset (for things like torches or snow)
+        if (voxelType == VoxelType.CACTUS) {
+            e = 0.125f;
+        } else if (voxelType == VoxelType.SNOW) {
+            h = Voxel.BLOCK_SIZE - 0.15f;
+        }
+        
+        float offset = (2048f/16)/2048f;
+        int[] t = getTextureCoords(voxelType);
+        
+        
+        // vertex, normal, texture, color
+        return new float[] {
+            // position
+            // normal
+            // texture
+
+            x, y + s, z - s,
+            lightness, lightness, lightness,
+            offset*(t[8] + 0), offset*(t[9] + 0),
+            
+            x, y + s, z + s,
+            lightness, lightness, lightness,
+            offset*(t[8] + 1), offset*(t[9] + 0),
+            
+            x, y - s, z + s,
+            lightness, lightness, lightness,
+            offset*(t[8] + 1), offset*(t[9] + 1),
+            
+            x, y - s, z - s,
+            lightness, lightness, lightness,
+            offset*(t[8] + 0), offset*(t[9] + 1)
+        };
+    }
+    
+    private static float[] getRightFaceCross(float lightness, VoxelType voxelType, float x, float y, float z) {
+        float s = ((float) Voxel.BLOCK_SIZE) / 2;
+        
+        float e = 0.0f; //extra side offset (for things like cacti)
+        float h = 0.0f; //extra top offset (for things like torches or snow)
+        if (voxelType == VoxelType.CACTUS) {
+            e = 0.125f;
+        } else if (voxelType == VoxelType.SNOW) {
+            h = Voxel.BLOCK_SIZE - 0.15f;
+        }
+        
+        float offset = (2048f/16)/2048f;
+        int[] t = getTextureCoords(voxelType);
+        
+        
+        // vertex, normal, texture, color
+        return new float[] {
+            // position
+            // normal
+            // texture
+
+            x, y + s, z + s,
+            lightness, lightness, lightness,
+            offset*(t[10] + 0), offset*(t[11] + 0),
+            
+            x, y + s, z - s,
+            lightness, lightness, lightness,
+            offset*(t[10] + 1), offset*(t[11] + 0),
+            
+            x, y - s, z - s,
+            lightness, lightness, lightness,
+            offset*(t[10] + 1), offset*(t[11] + 1),
+            
+            x, y - s, z + s,
+            lightness, lightness, lightness,
+            offset*(t[10] + 0), offset*(t[11] + 1)
+        };
+    }
+    
+    
+    
+    
     private static int[] getTextureCoords(VoxelType v) {
         int topX, btmX, fntX, bckX, lftX, rhtX;
         int topY, btmY, fntY, bckY, lftY, rhtY;
@@ -171,7 +645,7 @@ public class Voxel {
                 topY = btmY = lftY = rhtY = fntY = bckY = 1;
                 break;
             case TALL_GRASS:
-                topX = btmX = lftX = rhtX = fntX = bckX = 9;
+                topX = btmX = lftX = rhtX = fntX = bckX = 11;
                 topY = btmY = lftY = rhtY = fntY = bckY = 5;
                 break;
             case REED:
@@ -260,225 +734,5 @@ public class Voxel {
             lftX, lftY,
             rhtX, rhtY
         };
-    }
-    
-    public static int getTextureVertices(float[] buff, int startIndex, boolean[] faceVisible, VoxelType v) {
-        if (isCrossType(v)) {
-            faceVisible = new boolean[] { false, false, true, true, true, true };
-        }
-        return getTextureVerticesCube(buff, startIndex, faceVisible, v);
-    }
-    
-    private static int getTextureVerticesCube(float[] buff, int startIndex, boolean[] faceVisible, VoxelType v) {
-        int quadsWritten = 0;
-        float offset = (2048f/16)/2048f;
-        int floatsPerFace = 2 * 4;
-        int[] t = getTextureCoords(v);
-        
-        // top
-        if (faceVisible[0]) {
-            System.arraycopy(new float[] {
-                offset*(t[0] + 1), offset*(t[1] + 1),
-                offset*(t[0] + 0), offset*(t[1] + 1),
-                offset*(t[0] + 0), offset*(t[1] + 0),
-                offset*(t[0] + 1), offset*(t[1] + 0)
-            }, 0, buff, startIndex, floatsPerFace);
-            startIndex += floatsPerFace;
-            quadsWritten++;
-        }
-        
-        // bottom
-        if (faceVisible[1]) {
-            System.arraycopy(new float[] {
-                offset*(t[2] + 1), offset*(t[3] + 1),
-                offset*(t[2] + 0), offset*(t[3] + 1),
-                offset*(t[2] + 0), offset*(t[3] + 0),
-                offset*(t[2] + 1), offset*(t[3] + 0)
-            }, 0, buff, startIndex, floatsPerFace);
-            startIndex += floatsPerFace;
-            quadsWritten++;
-        }
-        
-        // front
-        if (faceVisible[2]) {
-            System.arraycopy(new float[] {
-                offset*(t[4] + 0), offset*(t[5] + 0),
-                offset*(t[4] + 1), offset*(t[5] + 0),
-                offset*(t[4] + 1), offset*(t[5] + 1),
-                offset*(t[4] + 0), offset*(t[5] + 1)
-            }, 0, buff, startIndex, floatsPerFace);
-            startIndex += floatsPerFace;
-            quadsWritten++;
-        }
-        
-        // back
-        if (faceVisible[3]) {
-            System.arraycopy(new float[] {
-                offset*(t[6] + 1), offset*(t[7] + 1),
-                offset*(t[6] + 0), offset*(t[7] + 1),
-                offset*(t[6] + 0), offset*(t[7] + 0),
-                offset*(t[6] + 1), offset*(t[7] + 0)
-            }, 0, buff, startIndex, floatsPerFace);
-            startIndex += floatsPerFace;
-            quadsWritten++;
-        }
-        
-        // left
-        if (faceVisible[4]) {
-            System.arraycopy(new float[] {
-                offset*(t[8] + 0), offset*(t[9] + 0),
-                offset*(t[8] + 1), offset*(t[9] + 0),
-                offset*(t[8] + 1), offset*(t[9] + 1),
-                offset*(t[8] + 0), offset*(t[9] + 1)
-            }, 0, buff, startIndex, floatsPerFace);
-            startIndex += floatsPerFace;
-            quadsWritten++;
-        }
-        
-        // right
-        if (faceVisible[5]) {
-            System.arraycopy(new float[] {
-                offset*(t[10] + 0), offset*(t[11] + 0),
-                offset*(t[10] + 1), offset*(t[11] + 0),
-                offset*(t[10] + 1), offset*(t[11] + 1),
-                offset*(t[10] + 0), offset*(t[11] + 1)
-            }, 0, buff, startIndex, floatsPerFace);
-            startIndex += floatsPerFace;
-            quadsWritten++;
-        }
-        
-        return quadsWritten * floatsPerFace;
-    }
-    
-    public static int getVertices(float[] buff, int startIndex, boolean[] faceVisible, VoxelType v, float x, float y, float z) {
-        if (isCrossType(v)) {
-            return getVerticesCross(buff, startIndex, v, x, y, z);
-        } else {
-            return getVerticesCube(buff, startIndex, faceVisible, v, x, y, z);
-        }
-    }
-    
-    private static int getVerticesCube(float[] buff, int startIndex, boolean[] faceVisible, VoxelType v, float x, float y, float z) {
-        int quadsAdded = 0;
-        float s = ((float) Voxel.BLOCK_SIZE) / 2;
-        int floatsPerFace = 3 * 4;
-        
-        float e = 0.0f; //extra side offset (for things like cacti)
-        float h = 0.0f; //extra top offset (for things like torches or snow)
-        if (v == VoxelType.CACTUS) {
-            e = 0.125f;
-        } else if (v == VoxelType.SNOW) {
-            h = Voxel.BLOCK_SIZE - 0.10f;
-            faceVisible[1] = false;
-        }
-        
-        // TOP QUAD
-        if (faceVisible[0]) {
-            System.arraycopy(new float[] {
-                x + s, y + s - h, z + s,
-                x - s, y + s - h, z + s,
-                x - s, y + s - h, z - s,
-                x + s, y + s - h, z - s
-            }, 0, buff, startIndex, floatsPerFace);
-            startIndex += floatsPerFace;
-            quadsAdded++;
-        }
-        
-        // BOTTOM QUAD
-        if (faceVisible[1]) {
-            System.arraycopy(new float[] {
-                x + s, y - s, z - s,
-                x - s, y - s, z - s,
-                x - s, y - s, z + s,
-                x + s, y - s, z + s
-            }, 0, buff, startIndex, floatsPerFace);
-            startIndex += floatsPerFace;
-            quadsAdded++;
-        }
-        
-        // FRONT QUAD
-        if (faceVisible[2]) {
-            System.arraycopy(new float[] {
-                x + s, y + s - h, z - s + e,
-                x - s, y + s - h, z - s + e,
-                x - s, y - s, z - s + e,
-                x + s, y - s, z - s + e
-            }, 0, buff, startIndex, floatsPerFace);
-            startIndex += floatsPerFace;
-            quadsAdded++;
-        }
-        
-        // BACK QUAD
-        if (faceVisible[3]) {
-            System.arraycopy(new float[] {
-                x + s, y - s, z + s - e,
-                x - s, y - s, z + s - e,
-                x - s, y + s - h, z + s - e,
-                x + s, y + s - h, z + s - e
-            }, 0, buff, startIndex, floatsPerFace);
-            startIndex += floatsPerFace;
-            quadsAdded++;
-        }
-        
-        // LEFT QUAD
-        if (faceVisible[4]) {
-            System.arraycopy(new float[] {
-                x - s + e, y + s - h, z - s,
-                x - s + e, y + s - h, z + s,
-                x - s + e, y - s, z + s,
-                x - s + e, y - s, z - s
-            }, 0, buff, startIndex, floatsPerFace);
-            startIndex += floatsPerFace;
-            quadsAdded++;
-        }
-        
-        // RIGHT QUAD
-        if (faceVisible[5]) {
-            System.arraycopy(new float[] {
-                x + s - e, y + s - h, z + s,
-                x + s - e, y + s - h, z - s,
-                x + s - e, y - s, z - s,
-                x + s - e, y - s, z + s
-            }, 0, buff, startIndex, floatsPerFace);
-            startIndex += floatsPerFace;
-            quadsAdded++;
-        }
-    
-        // return number of floats written
-        return quadsAdded * floatsPerFace;
-    }
-    
-    private static int getVerticesCross(float[] buff, int startIndex, VoxelType v, float x, float y, float z) {
-        int quadsAdded = 4;
-        float s = ((float) Voxel.BLOCK_SIZE) / 2;
-        int floatsPerFace = 3 * 4;
-        
-        System.arraycopy(new float[] {
-            // FRONT QUAD
-            x + s, y + s, z,
-            x - s, y + s, z,
-            x - s, y - s, z,
-            x + s, y - s, z,
-        
-            // BACK QUAD
-            x + s, y - s, z,
-            x - s, y - s, z,
-            x - s, y + s, z,
-            x + s, y + s, z,
-        
-            // LEFT QUAD
-            x, y + s, z - s,
-            x, y + s, z + s,
-            x, y - s, z + s,
-            x, y - s, z - s,
-        
-            // RIGHT QUAD
-            x, y + s, z + s,
-            x, y + s, z - s,
-            x, y - s, z - s,
-            x, y - s, z + s
-        }, 0, buff, startIndex, floatsPerFace * 4);
-        
-        return floatsPerFace * quadsAdded;
     }
 }

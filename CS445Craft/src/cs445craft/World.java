@@ -20,22 +20,24 @@ public class World {
     private final Map<Integer, Map<Integer, Chunk>> chunks;
     private final Map<Chunk, Integer> chunkToIndexI;
     private final Map<Chunk, Integer> chunkToIndexJ;
+    private final List<LightSource> lightSources;
     
     public World() {
         chunksList = new ArrayList<>();
         chunks = new HashMap<>();        
         chunkToIndexI = new HashMap<>();
         chunkToIndexJ = new HashMap<>();
+        lightSources = new ArrayList<>();
     }
     
     public void addChunk(Chunk chunk) {
         chunksList.add(chunk);
-        if (chunks.get(chunk.i) == null) {
-            chunks.put(chunk.i, new HashMap<>());
+        if (chunks.get(chunk.indexI) == null) {
+            chunks.put(chunk.indexI, new HashMap<>());
         }
-        chunks.get(chunk.i).put(chunk.j, chunk);
-        chunkToIndexI.put(chunk, chunk.i);
-        chunkToIndexJ.put(chunk, chunk.j);
+        chunks.get(chunk.indexI).put(chunk.indexJ, chunk);
+        chunkToIndexI.put(chunk, chunk.indexI);
+        chunkToIndexJ.put(chunk, chunk.indexJ);
     }
     
     public Chunk getChunk(int i, int j) {
@@ -162,13 +164,7 @@ public class World {
         
         Chunk c = getChunk(i, j);
         if (c != null) {
-            c.removeBlock(Math.floorMod(xIndex, CHUNK_S), yIndex, Math.floorMod(zIndex, CHUNK_S));
-        }
-    }
-    
-    public void swapMeshes() {
-        for (Chunk c: getChunks()) {
-            c.swapMesh();
+            c.breakBlock(Math.floorMod(xIndex, CHUNK_S), yIndex, Math.floorMod(zIndex, CHUNK_S));
         }
     }
 }

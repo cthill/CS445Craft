@@ -12,11 +12,12 @@
 ****************************************************************/
 package cs445craft;
 
-import static org.lwjgl.opengl.GL11.*;
+import static org.lwjgl.opengl.GL11.glRotatef;
+import static org.lwjgl.opengl.GL11.glTranslatef;
 
 public class Camera {
-    private static final float minPitch = -90.0f;
-    private static final float maxPitch = 90.0f;
+    private static final float MIN_PITCH = -90.0f;
+    private static final float MAX_PITCH = 90.0f;
     public float x,y,z, yaw, pitch;
     
     public Camera(float x, float y, float z) {
@@ -24,7 +25,7 @@ public class Camera {
         this.y = y;
         this.z = z;
         this.yaw = 180.0f;
-        this.pitch = 0.0f;
+        this.pitch = 45.0f;
     }
     
     /**
@@ -43,10 +44,10 @@ public class Camera {
     **/
     public void incPitch(float pitch) {
         this.pitch -= pitch;
-        if (this.pitch < minPitch) {
-            this.pitch = minPitch;
-        } else if (this.pitch > maxPitch) {
-            this.pitch = maxPitch;
+        if (this.pitch < MIN_PITCH) {
+            this.pitch = MIN_PITCH;
+        } else if (this.pitch > MAX_PITCH) {
+            this.pitch = MAX_PITCH;
         }
     }
     

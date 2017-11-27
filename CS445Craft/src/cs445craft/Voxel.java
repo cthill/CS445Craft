@@ -129,15 +129,15 @@ public class Voxel {
     }
     
     
-    public static void writeFaceVertices(float[] data, int writeIndex, int face, float brightness, VoxelType voxelType, int x, int y, int z) {
+    public static void writeFaceVertices(float[] data, int writeIndex, int face, VoxelType voxelType, int x, int y, int z) {
         if (isCrossType(voxelType)) {
-            writeFaceVerticesCross(data, writeIndex, face, brightness, voxelType, x, y, z);
+            writeFaceVerticesCross(data, writeIndex, face, voxelType, x, y, z);
         } else {
-            writeFaceVerticesCube(data, writeIndex, face, brightness, voxelType, x, y, z);
+            writeFaceVerticesCube(data, writeIndex, face, voxelType, x, y, z);
         }
     }
     
-    private static void writeFaceVerticesCross(float[] data, int writeIndex, int face, float brightness, VoxelType voxelType, int x, int y, int z) {
+    private static void writeFaceVerticesCross(float[] data, int writeIndex, int face, VoxelType voxelType, int x, int y, int z) {
         float blockX = (float) (x * Voxel.BLOCK_SIZE);
         float blockY = (float) (y * Voxel.BLOCK_SIZE);
         float blockZ = (float) (z * Voxel.BLOCK_SIZE);
@@ -145,16 +145,16 @@ public class Voxel {
         float[] vertices;
         switch (face) {
             case FACE_FRONT:
-                vertices = getFrontFaceCross(brightness, voxelType, blockX, blockY, blockZ);
+                vertices = getFrontFaceCross(voxelType, blockX, blockY, blockZ);
                 break;
             case FACE_BACK:
-                vertices = getBackFaceCross(brightness, voxelType, blockX, blockY, blockZ);
+                vertices = getBackFaceCross(voxelType, blockX, blockY, blockZ);
                 break;
             case FACE_LEFT:
-                vertices = getLeftFaceCross(brightness, voxelType, blockX, blockY, blockZ);
+                vertices = getLeftFaceCross(voxelType, blockX, blockY, blockZ);
                 break;
             case FACE_RIGHT:
-                vertices = getRightFaceCross(brightness, voxelType, blockX, blockY, blockZ);
+                vertices = getRightFaceCross(voxelType, blockX, blockY, blockZ);
                 break;
             default:
                 throw new RuntimeException("Unknown face");
@@ -163,7 +163,7 @@ public class Voxel {
         System.arraycopy(vertices, 0, data, writeIndex, vertices.length);
     }
     
-    private static void writeFaceVerticesCube(float[] data, int writeIndex, int face, float brightness, VoxelType voxelType, int x, int y, int z) {
+    private static void writeFaceVerticesCube(float[] data, int writeIndex, int face, VoxelType voxelType, int x, int y, int z) {
         float blockX = (float) (x * Voxel.BLOCK_SIZE);
         float blockY = (float) (y * Voxel.BLOCK_SIZE);
         float blockZ = (float) (z * Voxel.BLOCK_SIZE);
@@ -171,22 +171,22 @@ public class Voxel {
         float[] vertices;
         switch (face) {
             case FACE_TOP:
-                vertices = getTopFace(brightness, voxelType, blockX, blockY, blockZ);
+                vertices = getTopFace(voxelType, blockX, blockY, blockZ);
                 break;
             case FACE_BOTTOM:
-                vertices = getBottomFace(brightness, voxelType, blockX, blockY, blockZ);
+                vertices = getBottomFace(voxelType, blockX, blockY, blockZ);
                 break;
             case FACE_FRONT:
-                vertices = getFrontFace(brightness, voxelType, blockX, blockY, blockZ);
+                vertices = getFrontFace(voxelType, blockX, blockY, blockZ);
                 break;
             case FACE_BACK:
-                vertices = getBackFace(brightness, voxelType, blockX, blockY, blockZ);
+                vertices = getBackFace(voxelType, blockX, blockY, blockZ);
                 break;
             case FACE_LEFT:
-                vertices = getLeftFace(brightness, voxelType, blockX, blockY, blockZ);
+                vertices = getLeftFace(voxelType, blockX, blockY, blockZ);
                 break;
             case FACE_RIGHT:
-                vertices = getRightFace(brightness, voxelType, blockX, blockY, blockZ);
+                vertices = getRightFace(voxelType, blockX, blockY, blockZ);
                 break;
             default:
                 throw new RuntimeException("Unknown face");
@@ -195,7 +195,7 @@ public class Voxel {
         System.arraycopy(vertices, 0, data, writeIndex, vertices.length);
     }
     
-    private static float[] getTopFace(float lightness, VoxelType voxelType, float x, float y, float z) {
+    private static float[] getTopFace(VoxelType voxelType, float x, float y, float z) {
         float s = ((float) Voxel.BLOCK_SIZE) / 2;
         
         float e = 0.0f; //extra side offset (for things like cacti)
@@ -217,24 +217,20 @@ public class Voxel {
             // texture
 
             x + s, y + s - h, z + s,
-            lightness, lightness, lightness,
             offset*(t[0] + 1), offset*(t[1] + 1),
             
             x - s, y + s - h, z + s,
-            lightness, lightness, lightness,
             offset*(t[0] + 0), offset*(t[1] + 1),
             
             x - s, y + s - h, z - s,
-            lightness, lightness, lightness,
             offset*(t[0] + 0), offset*(t[1] + 0),
             
             x + s, y + s - h, z - s,
-            lightness, lightness, lightness,
             offset*(t[0] + 1), offset*(t[1] + 0)
         };
     }
     
-    private static float[] getBottomFace(float lightness, VoxelType voxelType, float x, float y, float z) {
+    private static float[] getBottomFace(VoxelType voxelType, float x, float y, float z) {
         float s = ((float) Voxel.BLOCK_SIZE) / 2;
         
         float e = 0.0f; //extra side offset (for things like cacti)
@@ -256,24 +252,20 @@ public class Voxel {
             // texture
 
             x + s, y - s, z - s,
-            lightness, lightness, lightness,
             offset*(t[2] + 1), offset*(t[3] + 1),
             
             x - s, y - s, z - s,
-            lightness, lightness, lightness,
             offset*(t[2] + 0), offset*(t[3] + 1),
             
             x - s, y - s, z + s,
-            lightness, lightness, lightness,
             offset*(t[2] + 0), offset*(t[3] + 0),
             
             x + s, y - s, z + s,
-            lightness, lightness, lightness,
             offset*(t[2] + 1), offset*(t[3] + 0),
         };
     }
     
-    private static float[] getFrontFace(float lightness, VoxelType voxelType, float x, float y, float z) {
+    private static float[] getFrontFace(VoxelType voxelType, float x, float y, float z) {
         float s = ((float) Voxel.BLOCK_SIZE) / 2;
         
         float e = 0.0f; //extra side offset (for things like cacti)
@@ -294,24 +286,20 @@ public class Voxel {
             // normal
             // texture
             x + s, y + s - h, z - s + e,
-            lightness, lightness, lightness,
             offset*(t[4] + 0), offset*(t[5] + 0),
             
             x - s, y + s - h, z - s + e,
-            lightness, lightness, lightness,
             offset*(t[4] + 1), offset*(t[5] + 0),
             
             x - s, y - s, z - s + e,
-            lightness, lightness, lightness,
             offset*(t[4] + 1), offset*(t[5] + 1),
             
             x + s, y - s, z - s + e,
-            lightness, lightness, lightness,
             offset*(t[4] + 0), offset*(t[5] + 1),
         };
     }
     
-    private static float[] getBackFace(float lightness, VoxelType voxelType, float x, float y, float z) {
+    private static float[] getBackFace(VoxelType voxelType, float x, float y, float z) {
         float s = ((float) Voxel.BLOCK_SIZE) / 2;
         
         float e = 0.0f; //extra side offset (for things like cacti)
@@ -333,24 +321,20 @@ public class Voxel {
             // texture
 
             x + s, y - s, z + s - e,
-            lightness, lightness, lightness,
             offset*(t[6] + 1), offset*(t[7] + 1),
             
             x - s, y - s, z + s - e,
-            lightness, lightness, lightness,
             offset*(t[6] + 0), offset*(t[7] + 1),
             
             x - s, y + s - h, z + s - e,
-            lightness, lightness, lightness,
             offset*(t[6] + 0), offset*(t[7] + 0),
             
             x + s, y + s - h, z + s - e,
-            lightness, lightness, lightness,
             offset*(t[6] + 1), offset*(t[7] + 0)
         };
     }
     
-    private static float[] getLeftFace(float lightness, VoxelType voxelType, float x, float y, float z) {
+    private static float[] getLeftFace(VoxelType voxelType, float x, float y, float z) {
         float s = ((float) Voxel.BLOCK_SIZE) / 2;
         
         float e = 0.0f; //extra side offset (for things like cacti)
@@ -372,24 +356,20 @@ public class Voxel {
             // texture
 
             x - s + e, y + s - h, z - s,
-            lightness, lightness, lightness,
             offset*(t[8] + 0), offset*(t[9] + 0),
             
             x - s + e, y + s - h, z + s,
-            lightness, lightness, lightness,
             offset*(t[8] + 1), offset*(t[9] + 0),
             
             x - s + e, y - s, z + s,
-            lightness, lightness, lightness,
             offset*(t[8] + 1), offset*(t[9] + 1),
             
             x - s + e, y - s, z - s,
-            lightness, lightness, lightness,
             offset*(t[8] + 0), offset*(t[9] + 1)
         };
     }
     
-    private static float[] getRightFace(float lightness, VoxelType voxelType, float x, float y, float z) {
+    private static float[] getRightFace(VoxelType voxelType, float x, float y, float z) {
         float s = ((float) Voxel.BLOCK_SIZE) / 2;
         
         float e = 0.0f; //extra side offset (for things like cacti)
@@ -411,19 +391,15 @@ public class Voxel {
             // texture
 
             x + s - e, y + s - h, z + s,
-            lightness, lightness, lightness,
             offset*(t[10] + 0), offset*(t[11] + 0),
             
             x + s - e, y + s - h, z - s,
-            lightness, lightness, lightness,
             offset*(t[10] + 1), offset*(t[11] + 0),
             
             x + s - e, y - s, z - s,
-            lightness, lightness, lightness,
             offset*(t[10] + 1), offset*(t[11] + 1),
             
             x + s - e, y - s, z + s,
-            lightness, lightness, lightness,
             offset*(t[10] + 0), offset*(t[11] + 1)
         };
     }
@@ -431,7 +407,7 @@ public class Voxel {
     
     
     
-    private static float[] getFrontFaceCross(float lightness, VoxelType voxelType, float x, float y, float z) {
+    private static float[] getFrontFaceCross(VoxelType voxelType, float x, float y, float z) {
         float s = ((float) Voxel.BLOCK_SIZE) / 2;
 
         float offset = (2048f/16)/2048f;
@@ -444,24 +420,20 @@ public class Voxel {
             // normal
             // texture
             x + s, y + s, z,
-            lightness, lightness, lightness,
             offset*(t[4] + 0), offset*(t[5] + 0),
             
             x - s, y + s, z,
-            lightness, lightness, lightness,
             offset*(t[4] + 1), offset*(t[5] + 0),
             
             x - s, y - s, z,
-            lightness, lightness, lightness,
             offset*(t[4] + 1), offset*(t[5] + 1),
             
             x + s, y - s, z,
-            lightness, lightness, lightness,
             offset*(t[4] + 0), offset*(t[5] + 1),
         };
     }
     
-    private static float[] getBackFaceCross(float lightness, VoxelType voxelType, float x, float y, float z) {
+    private static float[] getBackFaceCross(VoxelType voxelType, float x, float y, float z) {
         float s = ((float) Voxel.BLOCK_SIZE) / 2;
         
         float e = 0.0f; //extra side offset (for things like cacti)
@@ -483,24 +455,20 @@ public class Voxel {
             // texture
 
             x + s, y - s, z,
-            lightness, lightness, lightness,
             offset*(t[6] + 1), offset*(t[7] + 1),
             
             x - s, y - s, z,
-            lightness, lightness, lightness,
             offset*(t[6] + 0), offset*(t[7] + 1),
             
             x - s, y + s, z,
-            lightness, lightness, lightness,
             offset*(t[6] + 0), offset*(t[7] + 0),
             
             x + s, y + s, z,
-            lightness, lightness, lightness,
             offset*(t[6] + 1), offset*(t[7] + 0)
         };
     }
     
-    private static float[] getLeftFaceCross(float lightness, VoxelType voxelType, float x, float y, float z) {
+    private static float[] getLeftFaceCross(VoxelType voxelType, float x, float y, float z) {
         float s = ((float) Voxel.BLOCK_SIZE) / 2;
         
         float e = 0.0f; //extra side offset (for things like cacti)
@@ -522,24 +490,20 @@ public class Voxel {
             // texture
 
             x, y + s, z - s,
-            lightness, lightness, lightness,
             offset*(t[8] + 0), offset*(t[9] + 0),
             
             x, y + s, z + s,
-            lightness, lightness, lightness,
             offset*(t[8] + 1), offset*(t[9] + 0),
             
             x, y - s, z + s,
-            lightness, lightness, lightness,
             offset*(t[8] + 1), offset*(t[9] + 1),
             
             x, y - s, z - s,
-            lightness, lightness, lightness,
             offset*(t[8] + 0), offset*(t[9] + 1)
         };
     }
     
-    private static float[] getRightFaceCross(float lightness, VoxelType voxelType, float x, float y, float z) {
+    private static float[] getRightFaceCross(VoxelType voxelType, float x, float y, float z) {
         float s = ((float) Voxel.BLOCK_SIZE) / 2;
         
         float e = 0.0f; //extra side offset (for things like cacti)
@@ -561,19 +525,15 @@ public class Voxel {
             // texture
 
             x, y + s, z + s,
-            lightness, lightness, lightness,
             offset*(t[10] + 0), offset*(t[11] + 0),
             
             x, y + s, z - s,
-            lightness, lightness, lightness,
             offset*(t[10] + 1), offset*(t[11] + 0),
             
             x, y - s, z - s,
-            lightness, lightness, lightness,
             offset*(t[10] + 1), offset*(t[11] + 1),
             
             x, y - s, z + s,
-            lightness, lightness, lightness,
             offset*(t[10] + 0), offset*(t[11] + 1)
         };
     }

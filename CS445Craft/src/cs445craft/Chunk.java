@@ -37,8 +37,6 @@ public class Chunk extends Drawable {
     public int indexI, indexJ;
     public float chunkX, chunkY, chunkZ;
     private final VoxelType[][][] blocks;
-    private final int[][] sunlight;
-    private final int[][][] lightMap;
     
     private int numFaces;
     private int numFacesTranslucent;
@@ -46,7 +44,7 @@ public class Chunk extends Drawable {
     private final int VBOHandle;
     private final int VBOHandleTranslucent;
     
-    private boolean initialized, dirty, generated, built;
+    private boolean dirty, generated, built;
     
     public Chunk(World world, int indexI, int indexJ) {
         this.world = world;
@@ -58,19 +56,9 @@ public class Chunk extends Drawable {
         chunkY = 0.0f;
         
         blocks = new VoxelType[CHUNK_S][CHUNK_H][CHUNK_S];
-        lightMap = new int[CHUNK_S][CHUNK_H][CHUNK_S];
-        sunlight = new int[CHUNK_S][CHUNK_S];
-        
+
         VBOHandle = glGenBuffers();
         VBOHandleTranslucent = glGenBuffers();
-    }
-    
-    public boolean getInitialized() {
-        return initialized;
-    }
-    
-    public void setInitialized() {
-        initialized = true;
     }
     
     public boolean getDirty() {
@@ -110,40 +98,6 @@ public class Chunk extends Drawable {
             }
             x++;
         }
-    }
-    
-    
-    public void init() {
-        if (!getGenerated()) {
-            return;
-        }
-
-        ThreadMXBean threadTimer = ManagementFactory.getThreadMXBean();
-        long start = threadTimer.getCurrentThreadCpuTime();
-        
-        // compute initial sunlight array
-        for (int x = 0; x < CHUNK_S; x++) {
-            for (int z = 0; z < CHUNK_S; z++) {
-                for (int y = CHUNK_H - 2; y >= 0; y--) {
-                    if (blocks[x][y][z] != null && sunlight[x][z] == 0) {
-                        sunlight[x][z] = y + 1;
-                        break;
-                    }
-                }
-            }
-        }
-        
-        // propagate the sunlight
-        List<LightSource> sunlightSources = new ArrayList<>();
-        for (int x = 0; x < CHUNK_S; x++) {
-            for (int z = 0; z < CHUNK_S; z++) {
-                sunlightSources.add(new LightSource(x, sunlight[x][z], z, LightSource.MAX));
-                lightMapSetTraverseChunks(x, sunlight[x][z], z, LightSource.MAX);
-            }
-        }
-        propagateLight(sunlightSources);
-        
-        System.out.println("Lightmap " + indexI + "," + indexJ + " in " + (threadTimer.getCurrentThreadCpuTime() - start) / 1000000000.0);
     }
 
     /**
@@ -230,73 +184,7 @@ public class Chunk extends Drawable {
         return voxelLookupTraverseChunks(x, y, z, null);
     }
     
-    public int lightMapLookupTraverseChunks(int x, int y, int z) {
-        Chunk lookupChunk = traverseChunks(x, y, z);
-        if (lookupChunk == null) {
-            return LightSource.MAX * 2;
-        }
-        
-        int wrappedX = Math.floorMod(x, CHUNK_S);
-        int wrappedZ = Math.floorMod(z, CHUNK_S);
-        
-        return lookupChunk.lightMap[wrappedX][y][wrappedZ];
-    }
     
-    public void lightMapSetTraverseChunks(int x, int y, int z, int value) {
-        Chunk lookupChunk = traverseChunks(x, y, z);
-        if (lookupChunk == null) {
-            return;
-        }
-        
-        if (!this.equals(lookupChunk)) {
-            // mark the modified chunk for rebuild
-            lookupChunk.setDirty(true);
-        }
-        
-        int wrappedX = Math.floorMod(x, CHUNK_S);
-        int wrappedZ = Math.floorMod(z, CHUNK_S);
-        
-        lookupChunk.lightMap[wrappedX][y][wrappedZ] = value;
-    }
-    
-    private void propagateLight(Collection<LightSource> lights ) {
-        Queue<LightSource> lightBFSQueue = new LinkedList<>();
-        lightBFSQueue.addAll(lights);
-        while (!lightBFSQueue.isEmpty()) {
-            LightSource light = lightBFSQueue.remove();
-            int x = light.x;
-            int y = light.y;
-            int z = light.z;
-            
-            Chunk propChunk = traverseChunks(x, y, z);
-            if (propChunk == null || !propChunk.getGenerated()) {
-                // TODO: defer light propagation into null or ungenerated chunks
-                continue;
-            }
-            
-            lightAddBFSHelper(lightBFSQueue, light.value, x, y + 1, z);
-            lightAddBFSHelper(lightBFSQueue, light.value, x, y - 1, z);
-            lightAddBFSHelper(lightBFSQueue, light.value, x, y, z - 1);
-            lightAddBFSHelper(lightBFSQueue, light.value, x, y, z + 1);
-            lightAddBFSHelper(lightBFSQueue, light.value, x - 1, y, z);
-            lightAddBFSHelper(lightBFSQueue, light.value, x + 1, y, z);
-        }
-    }
-    
-    private void lightAddBFSHelper(Queue lightBFSQueue, int lightValue, int x, int y, int z) {
-        VoxelType adj = voxelLookupTraverseChunks(x, y, z);
-        if (adj == null || Voxel.isSeeTrough(adj)) {
-            int otherValue = lightMapLookupTraverseChunks(x, y, z);
-            if (otherValue < lightValue - 1) {
-                lightBFSQueue.add(new LightSource(x, y, z, lightValue - 1));
-                lightMapSetTraverseChunks(x, y, z, lightValue - 1);
-            }
-        }
-    }
-    
-    private void lightRemoveBFSHelper(Queue lightBFSQueue, int lightValue, int x, int y, int z) {
-        // TODO: allow for removal of light sources
-    }
 
     public void breakBlock(int x, int y, int z) {
         VoxelType v = voxelLookupSafe(x, y, z);
@@ -309,30 +197,7 @@ public class Chunk extends Drawable {
             
             // break block
             blocks[x][y][z] = null;
-            
-            List<LightSource> surroundingSources = new ArrayList<>();
-            
-            // check if block was hit by sunlight
-            if (sunlight[x][z] == y + 1) {
-                // fix the sunlight array
-                for (int sy = y; sy > 0; sy--) {
-                    if (blocks[x][sy - 1][z] != null) {
-                        sunlight[x][z] = sy;
-                        lightMap[x][sy][z] = LightSource.MAX;
-                        break;
-                    }
-                }
-            }
-            
-            // propagate the light around the broken block
-            removeBlockLightPropagationHelper(surroundingSources, x, y + 1, z);
-            removeBlockLightPropagationHelper(surroundingSources, x, y - 1, z);
-            removeBlockLightPropagationHelper(surroundingSources, x, y, z - 1);
-            removeBlockLightPropagationHelper(surroundingSources, x, y, z + 1);
-            removeBlockLightPropagationHelper(surroundingSources, x - 1, y, z);
-            removeBlockLightPropagationHelper(surroundingSources, x + 1, y, z);
-            
-            propagateLight(surroundingSources);            
+             
             rebuildMesh();
             
             // check if breaking block at chunk boundary
@@ -366,17 +231,6 @@ public class Chunk extends Drawable {
         }
     }
     
-    private void removeBlockLightPropagationHelper(Collection<LightSource> lightSources, int x, int y, int z) {
-        if (traverseChunks(x,y,z) != null) {
-            VoxelType adj = voxelLookupTraverseChunks(x,y,z);
-            if (adj == null || Voxel.isTranslucent(adj)) {
-                lightSources.add(new LightSource(x, y, z, lightMapLookupTraverseChunks(x, y, z)));
-            }
-        }
-    }
-    
-
-    
     /**
     * method: rebuildMesh()
     * purpose: Loop over the blocks array to build a 3d mesh of the chunk to
@@ -393,9 +247,8 @@ public class Chunk extends Drawable {
         
         // compute number of floats to be written
         int floatsPerFacePosition = 3 * 4;
-        int floatsPerFaceColor = 3 * 4;
         int floatsPerFaceTexture = 2 * 4;
-        int floatsPerFace = floatsPerFacePosition + floatsPerFaceColor + floatsPerFaceTexture;        
+        int floatsPerFace = floatsPerFacePosition + floatsPerFaceTexture;        
         int totalFloats = NUM_BLOCKS * 6 * floatsPerFace;
 
         // create float arrays to hold data
@@ -442,14 +295,12 @@ public class Chunk extends Drawable {
                     // loop over the faces and write them to the buffers
                     for (int face = 0; face < 6; face++) {
                         if (faceVisible[face]) {
-                            float brightness = getFaceBrightness(voxelType, face, x, y, z);
-                            
                             if (translucentTexture) {
-                                Voxel.writeFaceVertices(dataTranslucent, writeIndexTranslucent, face, brightness, voxelType, x, y, z);
+                                Voxel.writeFaceVertices(dataTranslucent, writeIndexTranslucent, face, voxelType, x, y, z);
                                 writeIndexTranslucent += floatsPerFace;
                                 numFacesTranslucent++;
                             } else {
-                                Voxel.writeFaceVertices(data, writeIndex, face, brightness, voxelType, x, y, z);
+                                Voxel.writeFaceVertices(data, writeIndex, face, voxelType, x, y, z);
                                 writeIndex += floatsPerFace;
                                 numFaces++;
                             }
@@ -494,35 +345,6 @@ public class Chunk extends Drawable {
         return false;
     }
     
-    private float getFaceBrightness(VoxelType voxelType, int face, int x, int y, int z) {
-        int lightMapValue = lightMap[x][y][z];
-        
-        if (!Voxel.isCrossType(voxelType)) {
-            switch(face) {
-                case Voxel.FACE_TOP:
-                    lightMapValue = lightMapLookupTraverseChunks(x, y + 1, z);
-                    break;
-                case Voxel.FACE_BOTTOM:
-                    lightMapValue = lightMapLookupTraverseChunks(x, y - 1, z);
-                    break;
-                case Voxel.FACE_FRONT:
-                    lightMapValue = lightMapLookupTraverseChunks(x, y, z - 1);
-                    break;
-                case Voxel.FACE_BACK:
-                    lightMapValue = lightMapLookupTraverseChunks(x, y, z + 1);
-                    break;
-                case Voxel.FACE_LEFT:
-                    lightMapValue = lightMapLookupTraverseChunks(x - 1, y, z);
-                    break;
-                case Voxel.FACE_RIGHT:
-                    lightMapValue = lightMapLookupTraverseChunks(x + 1, y, z);
-                    break;
-            }
-        }
-        
-        return LightSource.mapBrightness(lightMapValue);
-    }
-        
     /**
     * method: draw()
     * purpose: Use vertex buffers to draw the pre-built textured mesh to the
@@ -544,7 +366,6 @@ public class Chunk extends Drawable {
         }
         
         glEnableClientState(GL_VERTEX_ARRAY);
-        glEnableClientState (GL_COLOR_ARRAY);
         glEnableClientState (GL_TEXTURE_COORD_ARRAY);
         glPushMatrix();
         glTranslatef(chunkX, chunkY, chunkZ);
@@ -553,17 +374,15 @@ public class Chunk extends Drawable {
         glBindTexture(GL_TEXTURE_2D, 1);
         
         // Using interleved VBO for better performance
-        // (V,V,V,N,N,N,T,T)
-        int stride = 8 * 4;
+        // (V,V,V,T,T)
+        int stride = 5 * 4;
         glVertexPointer(3, GL_FLOAT, stride, 0);
-        glColorPointer(3, GL_FLOAT, stride, 3 * 4);
-        glTexCoordPointer(2, GL_FLOAT, stride, 6 * 4);
+        glTexCoordPointer(2, GL_FLOAT, stride, 3 * 4);
 
         glDrawArrays(GL_QUADS, 0, faces * 4);
         
         glPopMatrix();
         glDisableClientState(GL_VERTEX_ARRAY);
-        glDisableClientState (GL_COLOR_ARRAY);
         glDisableClientState (GL_TEXTURE_COORD_ARRAY);
     }
     

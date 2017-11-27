@@ -86,9 +86,7 @@ public class WorldGenerator {
         
         // rebuild all the meshes
         world.getChunks().forEach(chunk -> {
-            chunk.init();
             chunk.rebuildMesh();
-            chunk.setInitialized();
             chunk.setDirty(false);
         });
         

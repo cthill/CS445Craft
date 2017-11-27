@@ -88,16 +88,6 @@ public class Game {
             // draw frame
             screen.drawFrame();
             
-            //
-            world.getChunks().stream().filter(chunk -> chunk.getActive() && !chunk.getInitialized()).forEach(chunk -> {
-                chunk.setInitialized();
-                taskQueue.addTask(new Runnable() {
-                    public void run() {
-                        chunk.init();
-                    }
-                });
-            });
-            
             // the screen will mark drawn chunks as active
             world.getChunks().stream().filter(chunk -> chunk.getActive() && chunk.getDirty()).forEach(chunk -> {
                 chunk.setDirty(false);

@@ -22,9 +22,9 @@ import java.lang.management.ManagementFactory;
  */
 public class WorldGenerator {
     // generator constants
-    private static final int WORLD_HEADROOM = 15; // headroom for player building on top of world
+    private static final int WORLD_HEADROOM = 10; // headroom for player building on top of world
     private static final int BEDROCK_HEIGHT = 1;
-    private static final int ROCK_LAYER_HEIGHT = (Chunk.CHUNK_H - WORLD_HEADROOM) / 2;
+    private static final int ROCK_LAYER_HEIGHT = 2 * (Chunk.CHUNK_H - WORLD_HEADROOM) / 3;
     private static final int UPPER_LAYER_DIRT_DEPTH = 8;
     private static final int UPPER_LAYER_MAX_HEIGHT_DELTA = 30;
     
@@ -519,15 +519,15 @@ public class WorldGenerator {
             for (int dj = -d; dj <= d; dj++) {
                 addChunkGenerationTask(i + d, j + dj, newTasks, newChunks, screen);
                 addChunkGenerationTask(i - d, j + dj, newTasks, newChunks, screen);
-            }            
-        }
-        
-        newChunks.forEach(chunk -> {
-            // make sure adjacent chunks are rebuilt
-            world.findAllAdjacentChunks(chunk).forEach(adjChunk -> {
-                adjChunk.setDirty(true);
+            }
+            
+            newChunks.forEach(chunk -> {
+                // make sure adjacent chunks are rebuilt
+                world.findAllAdjacentChunks(chunk).forEach(adjChunk -> {
+                    adjChunk.setDirty(true);
+                });
             });
-        });
+        }
         return newTasks;
     }
     

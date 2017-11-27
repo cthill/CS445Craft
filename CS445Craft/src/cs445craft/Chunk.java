@@ -30,7 +30,7 @@ import static org.lwjgl.opengl.GL15.*;
 
 public class Chunk extends Drawable {
     public static final int CHUNK_S = 16;
-    public static final int CHUNK_H = 90;
+    public static final int CHUNK_H = 60;
     public static final int NUM_BLOCKS = CHUNK_S * CHUNK_H * CHUNK_S;
     
     private final World world;
@@ -88,7 +88,7 @@ public class Chunk extends Drawable {
     public void setGenerated(boolean generated) {
         this.generated = generated;
     }
-    
+
     public void copyBlocks(VoxelType[][][] wBlocks, int sx, int lx, int sy, int ly, int sz, int lz) {
         if (lx > CHUNK_S)
             lx = CHUNK_S;
@@ -270,6 +270,7 @@ public class Chunk extends Drawable {
             
             if (!traverseChunks(x, y, z).getGenerated()) {
                 // don't propagate light in to ungenerated chunks
+                // TODO: propagate the light once the chunk if generated
                 continue;
             }
             

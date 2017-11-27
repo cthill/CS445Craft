@@ -44,7 +44,7 @@ public class Chunk extends Drawable {
     private final int VBOHandle;
     private final int VBOHandleTranslucent;
     
-    private boolean dirty, generated, built;
+    private boolean dirty, generated, built, scheduledForRebuild;
     
     public Chunk(World world, int indexI, int indexJ) {
         this.world = world;
@@ -77,6 +77,14 @@ public class Chunk extends Drawable {
         this.generated = true;
     }
 
+    public boolean getScheduledForRebuild() {
+        return scheduledForRebuild;
+    }
+    
+    public void setScheduledForRebuild(boolean scheduledForRebuild) {
+        this.scheduledForRebuild = scheduledForRebuild;
+    }
+    
     public void copyBlocks(VoxelType[][][] wBlocks, int sx, int lx, int sy, int ly, int sz, int lz) {
         if (lx > CHUNK_S)
             lx = CHUNK_S;

@@ -16,7 +16,7 @@ public class Game {
     public static final int RES_HEIGHT = 768;
     
     // game constants
-    private static int CHUNK_GENERATION_BOUNDARY = 3;
+    private static int CHUNK_GENERATION_BOUNDARY = 2;
     private static final int INITIAL_WORLD_SIZE = CHUNK_GENERATION_BOUNDARY * 2 + 1;
     private static final boolean DYNAMIC_WORLD_GENERATION = true;
     private static final float MOUSE_SENS = 0.09f;
@@ -89,12 +89,12 @@ public class Game {
             screen.drawFrame();
             
             // the screen will mark drawn chunks as active
-            world.getChunks().stream().filter(chunk -> chunk.getActive() && chunk.getDirty()).forEach(chunk -> {
-                chunk.setDirty(false);
-                taskQueue.addTask(new Runnable() {
-                    public void run() {
-                        chunk.rebuildMesh();
-                    }
+            world.getChunks().stream().filter(chunk -> chunk.getActive() && chunk.getGenerated() && chunk.getDirty() && !chunk.getScheduledForRebuild()).forEach(chunk -> {
+                chunk.setScheduledForRebuild(true);
+                taskQueue.addTask(() -> {
+                    chunk.rebuildMesh();
+                    chunk.setDirty(false);
+                    chunk.setScheduledForRebuild(false);
                 });
             });
         }

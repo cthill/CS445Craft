@@ -86,6 +86,7 @@ public class WorldGenerator {
         
         // rebuild all the meshes
         world.getChunks().forEach(chunk -> {
+            chunk.setGenerated();
             chunk.rebuildMesh();
             chunk.setDirty(false);
         });
@@ -539,6 +540,8 @@ public class WorldGenerator {
             // generate the chunk later
             newTasks.add((Runnable) () -> {
                 fillChunkGenerateRandom(c);
+                c.setGenerated();
+                c.setDirty(true);
             });
         }
     }

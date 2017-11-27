@@ -180,7 +180,7 @@ public class WorldGenerator {
         }
         
         chunk.copyBlocks(blocks, 0, CHUNK_S, 0, CHUNK_H, 0, CHUNK_S);
-        chunk.setGenerated(true);
+        chunk.setGenerated();
         System.out.println("Generated " + chunk.indexI + "," + chunk.indexJ + " in " + (threadTimer.getCurrentThreadCpuTime() - start) / 1000000000.0);
     }
     

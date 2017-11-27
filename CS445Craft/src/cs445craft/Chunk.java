@@ -29,7 +29,7 @@ import static org.lwjgl.opengl.GL11.*;
 import static org.lwjgl.opengl.GL15.*;
 
 public class Chunk extends Drawable {
-    public static final int CHUNK_S = 16;
+    public static final int CHUNK_S = 30;
     public static final int CHUNK_H = 60;
     public static final int NUM_BLOCKS = CHUNK_S * CHUNK_H * CHUNK_S;
     
@@ -85,8 +85,8 @@ public class Chunk extends Drawable {
         return generated;
     }
     
-    public void setGenerated(boolean generated) {
-        this.generated = generated;
+    public void setGenerated() {
+        this.generated = true;
     }
 
     public void copyBlocks(VoxelType[][][] wBlocks, int sx, int lx, int sy, int ly, int sz, int lz) {
@@ -268,9 +268,9 @@ public class Chunk extends Drawable {
             int y = light.y;
             int z = light.z;
             
-            if (!traverseChunks(x, y, z).getGenerated()) {
-                // don't propagate light in to ungenerated chunks
-                // TODO: propagate the light once the chunk if generated
+            Chunk propChunk = traverseChunks(x, y, z);
+            if (propChunk == null || !propChunk.getGenerated()) {
+                // TODO: defer light propagation into null or ungenerated chunks
                 continue;
             }
             
@@ -297,7 +297,7 @@ public class Chunk extends Drawable {
     private void lightRemoveBFSHelper(Queue lightBFSQueue, int lightValue, int x, int y, int z) {
         // TODO: allow for removal of light sources
     }
-    
+
     public void breakBlock(int x, int y, int z) {
         VoxelType v = voxelLookupSafe(x, y, z);
         if (v != null) {

@@ -16,7 +16,7 @@ public class Game {
     public static final int RES_HEIGHT = 768;
     
     // game constants
-    private static int CHUNK_GENERATION_BOUNDARY = 2;
+    private static int CHUNK_GENERATION_BOUNDARY = 3;
     private static final int INITIAL_WORLD_SIZE = CHUNK_GENERATION_BOUNDARY * 2 + 1;
     private static final boolean DYNAMIC_WORLD_GENERATION = true;
     private static final float MOUSE_SENS = 0.09f;

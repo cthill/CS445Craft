@@ -16,8 +16,8 @@ public class Game {
     public static final int RES_HEIGHT = 768;
     
     // game constants
-    private static int CHUNK_GENERATION_BOUNDARY = 5;
-    private static final int INITIAL_WORLD_SIZE = 7;
+    private static int CHUNK_GENERATION_BOUNDARY = 2;
+    private static final int INITIAL_WORLD_SIZE = CHUNK_GENERATION_BOUNDARY * 2 + 1;
     private static final boolean DYNAMIC_WORLD_GENERATION = true;
     private static final float MOUSE_SENS = 0.09f;
     private static final float MOVEMENT_SPEED = .20f;
@@ -29,7 +29,7 @@ public class Game {
     private static final float SIDE_COLLIDE_HEIGHT_FACTOR = 0.75f;
         
     // game variables
-    private boolean noClip, lastSpaceState, lastVState, lastRState, lastLeftMouseState, lastUpState, lastDownState;
+    private boolean noClip, lastSpaceState, lastVState, lastLeftMouseState, lastUpState, lastDownState;
     private int worldX, worldZ, chunkI, chunkJ;
     private float yspeed;
     
@@ -56,10 +56,6 @@ public class Game {
         world = worldGen.getOrGenerate();
         taskQueue = new TaskQueue();
         
-        // build the meshes and add the chunks to the screen
-        world.getChunks().forEach(chunk -> {
-           chunk.rebuildMesh();
-        });
         screen.addObjects(world.getChunks());
         
         init();
@@ -91,6 +87,26 @@ public class Game {
             taskQueue.run(1);            
             // draw frame
             screen.drawFrame();
+            
+            //
+            world.getChunks().stream().filter(chunk -> chunk.getActive() && !chunk.getInitialized()).forEach(chunk -> {
+                chunk.setInitialized();
+                taskQueue.addTask(new Runnable() {
+                    public void run() {
+                        chunk.init();
+                    }
+                });
+            });
+            
+            // the screen will mark drawn chunks as active
+            world.getChunks().stream().filter(chunk -> chunk.getActive() && chunk.getDirty()).forEach(chunk -> {
+                chunk.setDirty(false);
+                taskQueue.addTask(new Runnable() {
+                    public void run() {
+                        chunk.rebuildMesh();
+                    }
+                });
+            });
         }
     }
     
@@ -119,6 +135,7 @@ public class Game {
 
         if (gridPositionUpdated || chunkPositionUpdated) {
             System.out.println("pos (" + worldX + "," + worldZ + ") chunk (" + chunkI + "," + chunkJ + ")");
+            //screen.moveWorldLight(worldX * Voxel.BLOCK_SIZE, -worldZ * Voxel.BLOCK_SIZE);
         }
 
         if (chunkPositionUpdated && DYNAMIC_WORLD_GENERATION) {
@@ -175,15 +192,6 @@ public class Game {
             }
         } else {
             lastVState = false;
-        }
-
-        if (Keyboard.isKeyDown(Keyboard.KEY_R)) {
-            if (!lastRState) {
-                lastRState = true;
-                world.swapMeshes();
-            }
-        } else {
-            lastRState = false;
         }
         
         if (Keyboard.isKeyDown(Keyboard.KEY_UP)) {
@@ -322,6 +330,8 @@ public class Game {
         camera.x += dx;
         camera.z += dz;
         camera.y += dy;
+        
+        screen.moveLight(camera.x, camera.y, camera.z);
     }
     
     private void checkPlayerStatus() {

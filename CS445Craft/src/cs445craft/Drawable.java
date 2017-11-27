@@ -13,13 +13,14 @@
 package cs445craft;
 
 public abstract class Drawable {    
+    private boolean active;
+    
     /**
     * method: draw
     * purpose: abstract method to draw the object to the screen. Call on each
     * frame.
     **/
     public abstract void draw();
-    
     public abstract void drawTranslucent();
     
     public abstract float distanceTo(float x, float y, float z);
@@ -27,4 +28,16 @@ public abstract class Drawable {
     public abstract float getX();
     public abstract float getY();
     public abstract float getZ();
+    
+    public void activate() {
+        active = true;
+    };
+    
+    public void deactivate() {
+        active = false;
+    };
+    
+    public boolean getActive() {
+        return active;
+    }
 }

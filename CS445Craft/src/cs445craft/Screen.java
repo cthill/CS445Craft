@@ -39,6 +39,9 @@ public class Screen {
     private Font awtFont;
     private TrueTypeFont font;
     
+//    private FloatBuffer lightPosition;
+//    private FloatBuffer lightColor;
+    
     public Screen(int width, int height, String title, Camera camera) throws LWJGLException {
         this.width = width;
         this.height = height;
@@ -57,14 +60,22 @@ public class Screen {
         
         glClearColor(0.5f, 0.85f, 1.0f, 1.0f);
         glEnable(GL_TEXTURE_2D);
-        glEnableClientState (GL_TEXTURE_COORD_ARRAY);
-        glEnableClientState(GL_VERTEX_ARRAY);
         glAlphaFunc(GL_GREATER, 0.5f);
         glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
         glFrontFace(GL_CW);
         
+//        lightPosition = BufferUtils.createFloatBuffer(4);
+//        lightPosition.put(0).put((Chunk.CHUNK_H + 5) * Voxel.BLOCK_SIZE).put(0).put(1.0f).flip();
+//        lightColor = BufferUtils.createFloatBuffer(4);
+//        lightColor.put(1.0f).put(1.0f).put(1.0f).put(1.0f).flip();        
+
 //        awtFont = new Font("Times New Roman", Font.PLAIN, 24);
 //        font = new TrueTypeFont(awtFont, false);
+    }
+    
+    public void moveLight(float x, float y, float z) {
+//        lightPosition = BufferUtils.createFloatBuffer(4);
+//        lightPosition.put(x).put(y).put(z).put(1.0f).flip();
     }
 
     /**
@@ -105,7 +116,6 @@ public class Screen {
     
     private void render3D() {
         // setup 3d config
-        glShadeModel(GL_SMOOTH);
         glEnable(GL_DEPTH_TEST);
         glEnable(GL_CULL_FACE);
         glDisable(GL_BLEND);
@@ -121,6 +131,13 @@ public class Screen {
         glLoadIdentity();
         glPushMatrix();
         camera.lookThrough();
+        
+//        glEnable(GL_LIGHTING);//enables our lighting
+//        glLight(GL_LIGHT0, GL_POSITION, lightPosition);
+//        glLight(GL_LIGHT0, GL_SPECULAR, lightColor);
+//        glLight(GL_LIGHT0, GL_DIFFUSE, lightColor);
+//        glLight(GL_LIGHT0, GL_AMBIENT, lightColor);
+//        glEnable(GL_LIGHT0);
 
         // 3d draw solid objects
         glEnable(GL_ALPHA_TEST);
@@ -128,16 +145,13 @@ public class Screen {
         objects.sort(Comparator.comparing(object -> ((Drawable) object).distanceTo(camera.x, camera.y, camera.z)).reversed());
         for (Drawable object: objects) {
             if (object.distanceTo(camera.x, object.getY(), camera.z) <= DRAW_DIST) {
+                object.activate();
                 object.draw();
+            } else {
+                object.deactivate();
             }
         }
         glDisable(GL_ALPHA_TEST);
-        glLightModeli(GL_LIGHT_MODEL_LOCAL_VIEWER, GL_TRUE);
-        glEnable(GL_LIGHTING);
-        glEnable(GL_LIGHT0);
-        glLightModel(GL_LIGHT_MODEL_AMBIENT, asFloatBuffer(new float[]{1.0f, 1.0f, 1.0f, 1f}));
-        glLight(GL_LIGHT0, GL_DIFFUSE, asFloatBuffer(new float[]{25f,25f,25f,1}));
-        glLight(GL_LIGHT0, GL_POSITION, asFloatBuffer(new float[]{0f, 0f, 200f, 2f}));        
         
         // 3d draw translucent objects
         glEnable(GL_BLEND);
@@ -155,10 +169,11 @@ public class Screen {
         // 3d draw finish
         glPopMatrix();
         glColor3f(1.0f,1.0f,1.0f);
+//        glDisable(GL_LIGHTING);
     }
     
     private void render2D() {
-        // smooth shading
+
         
         // switch to 2d mode for hud draw
         glMatrixMode(GL_PROJECTION);
@@ -217,12 +232,5 @@ public class Screen {
     **/
     public void close() {
         Display.destroy();
-    }
-    
-    private FloatBuffer asFloatBuffer(float[] values) {
-        FloatBuffer buffer = BufferUtils.createFloatBuffer(values.length);
-        buffer.put(values);
-        buffer.flip();
-        return buffer;
     }
 }

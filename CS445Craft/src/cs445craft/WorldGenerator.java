@@ -88,6 +88,7 @@ public class WorldGenerator {
         world.getChunks().forEach(chunk -> {
             chunk.setGenerated();
             chunk.rebuildMesh();
+            chunk.copyMeshToVBO();
         });
         
         return world;

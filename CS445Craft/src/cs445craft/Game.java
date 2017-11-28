@@ -15,6 +15,7 @@ public class Game {
     // resolution
     public static final int RES_WIDTH = 1024;
     public static final int RES_HEIGHT = 768;
+    public static final int ASYNC_TASKS_PER_FRAME = 2;
     
     // game constants
     private static int CHUNK_GENERATION_BOUNDARY = 4;
@@ -42,8 +43,8 @@ public class Game {
     private final Screen screen;
     
     private final Set<Chunk> scheduledForRebuild;
-    private final BlockingQueue<Chunk> ungeneratedChunkQueue;
-    private final Thread chunkGenerator;
+    private final BlockingQueue<Chunk> ungeneratedChunkQueue, unbuiltChunkQueue, builtChunkQueue;
+    private final Thread chunkGenerator, meshBuilder;
     
     public Game() throws LWJGLException, IOException {        
         // init camera and screen
@@ -68,6 +69,11 @@ public class Game {
         // setup the chunk generation thread
         ungeneratedChunkQueue = new LinkedBlockingQueue<Chunk>();
         chunkGenerator = new ChunkGenerator(ungeneratedChunkQueue);
+        
+        // setup mesh building thread
+        unbuiltChunkQueue = new LinkedBlockingQueue<Chunk>();
+        builtChunkQueue = new LinkedBlockingQueue<Chunk>();
+        meshBuilder = new MeshBuilder(unbuiltChunkQueue, builtChunkQueue);
                 
         init();
     }
@@ -80,6 +86,7 @@ public class Game {
     
     public void run() {
         chunkGenerator.start();
+        meshBuilder.start();
         
         while(true) {
             // listen for q key or closeRequested
@@ -97,8 +104,11 @@ public class Game {
             checkPlayerStatus();
             
             // run one async task
-            Runnable task = taskQueue.poll();
-            if (task != null) {
+            for (int i = 0; i < ASYNC_TASKS_PER_FRAME; i++) {
+                Runnable task = taskQueue.poll();
+                if (task == null) {
+                    break;
+                }
                 task.run();
             }
             
@@ -109,13 +119,21 @@ public class Game {
             world.getChunks().stream().filter(chunk -> chunk.getActive() && chunk.getGenerated() && chunk.getDirty() && !scheduledForRebuild.contains(chunk)).forEach(chunk -> {
                 scheduledForRebuild.add(chunk);
                 taskQueue.add(() -> {
-                    chunk.rebuildMesh();
-                    scheduledForRebuild.remove(chunk);
+                    unbuiltChunkQueue.add(chunk);
                 });
             });
+            
+            while (!builtChunkQueue.isEmpty()) {
+                Chunk chunk = builtChunkQueue.poll();
+                taskQueue.add(() -> {
+                    chunk.copyMeshToVBO();
+                    scheduledForRebuild.remove(chunk);
+                });
+            }
         }
         
         ((ChunkGenerator) chunkGenerator).terminate();
+        ((MeshBuilder) meshBuilder).terminate();
     }
     
     private void updateWorldPos() {
@@ -382,6 +400,37 @@ public class Game {
                     // set adjacent chunks as dirty so they will be rebuild as well
                     adjChunk.setDirty();
                 });
+            }
+        }
+    }
+    
+    
+    private class MeshBuilder extends Thread {
+        private boolean done;
+        private final BlockingQueue<Chunk> unbuiltMeshQueue;
+        private final BlockingQueue<Chunk> builtMeshQueue;
+        
+        MeshBuilder(BlockingQueue<Chunk> unbuiltQueue, BlockingQueue<Chunk> builtQueue) {
+            this.done = false;
+            this.unbuiltMeshQueue = unbuiltQueue;
+            this.builtMeshQueue = builtQueue;
+        }
+        
+        public void terminate() {
+            done = true;
+        }
+        
+        @Override
+        public void run() {
+            while (!done) {
+                Chunk chunkToBuild = unbuiltMeshQueue.poll();
+                if (chunkToBuild == null) {
+                    continue;
+                }
+                
+                chunkToBuild.rebuildMesh();
+                
+                builtMeshQueue.add(chunkToBuild);
             }
         }
     }

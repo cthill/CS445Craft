@@ -24,7 +24,7 @@ import static org.lwjgl.opengl.GL11.*;
 import static org.lwjgl.opengl.GL15.*;
 
 public class Chunk extends Drawable {
-    public static final int CHUNK_S = 16;
+    public static final int CHUNK_S = 30;
     public static final int CHUNK_H = 90;
     public static final int NUM_BLOCKS = CHUNK_S * CHUNK_H * CHUNK_S;
     
@@ -33,11 +33,15 @@ public class Chunk extends Drawable {
     public float chunkX, chunkY, chunkZ;
     private final VoxelType[][][] blocks;
     
-    private int numFaces;
-    private int numFacesTranslucent;
+    private int numFaces, numFacesTranslucent, tempNumFaces, tempNumFacesTranslucent;
     
     private final int VBOHandle;
     private final int VBOHandleTranslucent;
+    
+    int writeIndex;
+    int writeIndexTranslucent;
+    float[] tempMeshData;
+    float[] tempMeshDataTranslucent;
     
     private boolean dirty, generated, built;
     
@@ -193,6 +197,7 @@ public class Chunk extends Drawable {
             // break block and fix the mesh
             blocks[y][x][z] = null;
             rebuildMesh();
+            copyMeshToVBO();
             
             // check if breaking block at chunk boundary
             int xDir = 0;
@@ -212,8 +217,8 @@ public class Chunk extends Drawable {
                 // lookup adjacent chunk and mark it as dirty so the mesh will be rebuilt
                 Chunk adjacent = world.findAdjacentChunk(this, xDir, 0);
                 if (adjacent != null) {
-                    //adjacent.setDirty();
-                    adjacent.rebuildMesh();
+                    adjacent.setDirty();
+                    //adjacent.rebuildMesh();
                 }
             }
             
@@ -221,8 +226,9 @@ public class Chunk extends Drawable {
                 // lookup adjacent chunk and mark it as dirty so the mesh will be rebuilt
                 Chunk adjacent = world.findAdjacentChunk(this, 0, zDir);
                 if (adjacent != null) {
-                    //adjacent.setDirty();
-                    adjacent.rebuildMesh();
+                    adjacent.setDirty();
+                    //adjacent.rebuildMesh();
+                    //adjacent.copyMeshToVBO();
                 }
             }
         }
@@ -239,8 +245,8 @@ public class Chunk extends Drawable {
         long start = threadTimer.getCurrentThreadCpuTime();
         
         // reset number of faces
-        numFaces = 0;
-        numFacesTranslucent = 0;
+        tempNumFaces = 0;
+        tempNumFacesTranslucent = 0;
         
         // compute number of floats to be written
         int floatsPerFacePosition = 3 * 4;
@@ -249,10 +255,10 @@ public class Chunk extends Drawable {
         int totalFloats = NUM_BLOCKS * 6 * floatsPerFace;
 
         // create float arrays to hold data
-        int writeIndex = 0;
-        int writeIndexTranslucent = 0;
-        float[] tempMeshData = new float[totalFloats];
-        float[] tempMeshDataTranslucent = new float[totalFloats];
+        writeIndex = 0;
+        writeIndexTranslucent = 0;
+        tempMeshData = new float[totalFloats];
+        tempMeshDataTranslucent = new float[totalFloats];
 
         // loop over each block in this chunk
         for (int y = 0; y < CHUNK_H; y++) {
@@ -295,18 +301,27 @@ public class Chunk extends Drawable {
                             if (translucentTexture) {
                                 Voxel.writeFaceVertices(tempMeshDataTranslucent, writeIndexTranslucent, face, voxelType, x, y, z);
                                 writeIndexTranslucent += floatsPerFace;
-                                numFacesTranslucent++;
+                                tempNumFacesTranslucent++;
                             } else {
                                 Voxel.writeFaceVertices(tempMeshData, writeIndex, face, voxelType, x, y, z);
                                 writeIndex += floatsPerFace;
-                                numFaces++;
+                                tempNumFaces++;
                             }
                         }
                     }
                 }
             }
+            
+            Thread.yield();
         }
-
+        
+        System.out.println("MeshBuild " + indexI + "," + indexJ + " in " + (threadTimer.getCurrentThreadCpuTime() - start) / 1000000000.0);
+    }
+    
+    public void copyMeshToVBO() {
+        ThreadMXBean threadTimer = ManagementFactory.getThreadMXBean();
+        long start = threadTimer.getCurrentThreadCpuTime();
+        
         // create VBOs
         FloatBuffer vertexVBO = BufferUtils.createFloatBuffer(writeIndex);
         FloatBuffer vertexTranslucentVBO = BufferUtils.createFloatBuffer(writeIndexTranslucent);
@@ -322,11 +337,19 @@ public class Chunk extends Drawable {
         glBufferData(GL_ARRAY_BUFFER, vertexTranslucentVBO, GL_STATIC_DRAW);
         glBindBuffer(GL_ARRAY_BUFFER, 0);
         
+        // copy over number of faces
+        numFaces = tempNumFaces;
+        numFacesTranslucent = tempNumFacesTranslucent;
+        
+        // clear out temp buffers
+        tempMeshData = null;
+        tempMeshDataTranslucent = null;
+        
+        System.out.println("MeshVBOCopy " + indexI + "," + indexJ + " in " + (threadTimer.getCurrentThreadCpuTime() - start) / 1000000000.0);
+        
         // set the flags
         dirty = false;
         built = true;
-        
-        System.out.println("Mesh " + indexI + "," + indexJ + " in " + (threadTimer.getCurrentThreadCpuTime() - start) / 1000000000.0);
     }
     
     private boolean shouldDrawFace(VoxelType v, VoxelType adjacent) {

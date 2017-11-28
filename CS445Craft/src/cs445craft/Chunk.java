@@ -19,18 +19,13 @@ import cs445craft.Voxel.VoxelType;
 import java.lang.management.ManagementFactory;
 import java.lang.management.ThreadMXBean;
 import java.nio.FloatBuffer;
-import java.util.ArrayList;
-import java.util.Collection;
-import java.util.LinkedList;
-import java.util.List;
-import java.util.Queue;
 import org.lwjgl.BufferUtils;
 import static org.lwjgl.opengl.GL11.*;
 import static org.lwjgl.opengl.GL15.*;
 
 public class Chunk extends Drawable {
-    public static final int CHUNK_S = 30;
-    public static final int CHUNK_H = 60;
+    public static final int CHUNK_S = 16;
+    public static final int CHUNK_H = 90;
     public static final int NUM_BLOCKS = CHUNK_S * CHUNK_H * CHUNK_S;
     
     private final World world;
@@ -55,7 +50,8 @@ public class Chunk extends Drawable {
         chunkZ = indexJ * CHUNK_S * Voxel.BLOCK_SIZE;
         chunkY = 0.0f;
         
-        blocks = new VoxelType[CHUNK_S][CHUNK_H][CHUNK_S];
+        // ordering: y, x, z
+        blocks = new VoxelType[CHUNK_H][CHUNK_S][CHUNK_S];
 
         VBOHandle = glGenBuffers();
         VBOHandleTranslucent = glGenBuffers();
@@ -86,25 +82,25 @@ public class Chunk extends Drawable {
     }
     
     public void copyBlocks(VoxelType[][][] wBlocks, int sx, int lx, int sy, int ly, int sz, int lz) {
-        if (lx > CHUNK_S)
-            lx = CHUNK_S;
         if (ly > CHUNK_H)
             ly = CHUNK_H;
+        if (lx > CHUNK_S)
+            lx = CHUNK_S;
         if (lz > CHUNK_S)
             lz = CHUNK_S;
         
-        int x = 0;
-        for (int ix = sx; ix < sx + lx; ix++) {
-            int y = 0;
+        int y = 0;
             for (int iy = sy; iy < sy + ly; iy++) {
+            int x = 0;
+            for (int ix = sx; ix < sx + lx; ix++) {
                 int z = 0;
                 for (int iz = sz; iz < sz + lz; iz++) {
-                    this.blocks[x][y][z] = wBlocks[ix][iy][iz];
+                    this.blocks[y][x][z] = wBlocks[iy][ix][iz];
                     z++;
                 }
-                y++;
+                x++;
             }
-            x++;
+            y++;
         }
     }
 
@@ -115,11 +111,11 @@ public class Chunk extends Drawable {
     **/
     private VoxelType voxelLookupSafe(int x, int y, int z) {
         if (
-            x >= 0 && x < CHUNK_S &&
             y >= 0 && y < CHUNK_H &&
+            x >= 0 && x < CHUNK_S &&
             z >= 0 && z < CHUNK_S
         ) {
-            return blocks[x][y][z];
+            return blocks[y][x][z];
         }
         
         return null;
@@ -134,7 +130,6 @@ public class Chunk extends Drawable {
         if (!Voxel.isSolid(block)) {
             return null;
         }
-        else 
         return block;
     }
     
@@ -185,7 +180,7 @@ public class Chunk extends Drawable {
         int wrappedX = Math.floorMod(x, CHUNK_S);
         int wrappedZ = Math.floorMod(z, CHUNK_S);
         
-        return lookupChunk.blocks[wrappedX][y][wrappedZ]; //voxelLookupSave(wrappedX, y, wrappedZ);
+        return lookupChunk.blocks[y][wrappedX][wrappedZ]; //voxelLookupSave(wrappedX, y, wrappedZ);
     }
     
     public VoxelType voxelLookupTraverseChunks(int x, int y, int z) {
@@ -204,7 +199,7 @@ public class Chunk extends Drawable {
             }
             
             // break block
-            blocks[x][y][z] = null;
+            blocks[y][x][z] = null;
              
             rebuildMesh();
             
@@ -262,14 +257,14 @@ public class Chunk extends Drawable {
         // create float arrays to hold data
         int writeIndex = 0;
         int writeIndexTranslucent = 0;
-        float[] data = new float[totalFloats];
-        float[] dataTranslucent = new float[totalFloats];
+        float[] tempMeshData = new float[totalFloats];
+        float[] tempMeshDataTranslucent = new float[totalFloats];
 
         // loop over each block in this chunk
-        for (int x = 0; x < CHUNK_S; x++) {
-            for (int z = 0; z < CHUNK_S; z++) {
-                for (int y = 0; y < CHUNK_H; y++) {
-                    VoxelType voxelType = blocks[x][y][z];
+        for (int y = 0; y < CHUNK_H; y++) {
+            for (int x = 0; x < CHUNK_S; x++) {
+                for (int z = 0; z < CHUNK_S; z++) {
+                    VoxelType voxelType = blocks[y][x][z];
                     
                     // null is used for empty cells
                     if (voxelType == null) {
@@ -304,11 +299,11 @@ public class Chunk extends Drawable {
                     for (int face = 0; face < 6; face++) {
                         if (faceVisible[face]) {
                             if (translucentTexture) {
-                                Voxel.writeFaceVertices(dataTranslucent, writeIndexTranslucent, face, voxelType, x, y, z);
+                                Voxel.writeFaceVertices(tempMeshDataTranslucent, writeIndexTranslucent, face, voxelType, x, y, z);
                                 writeIndexTranslucent += floatsPerFace;
                                 numFacesTranslucent++;
                             } else {
-                                Voxel.writeFaceVertices(data, writeIndex, face, voxelType, x, y, z);
+                                Voxel.writeFaceVertices(tempMeshData, writeIndex, face, voxelType, x, y, z);
                                 writeIndex += floatsPerFace;
                                 numFaces++;
                             }
@@ -317,14 +312,14 @@ public class Chunk extends Drawable {
                 }
             }
         }
-        
+
         // create VBOs
         FloatBuffer vertexVBO = BufferUtils.createFloatBuffer(writeIndex);
         FloatBuffer vertexTranslucentVBO = BufferUtils.createFloatBuffer(writeIndexTranslucent);
         
         // copy float data to VBOs
-        ((FloatBuffer) vertexVBO.clear()).put(data, 0, writeIndex).flip();
-        ((FloatBuffer) vertexTranslucentVBO.clear()).put(dataTranslucent, 0, writeIndexTranslucent).flip();
+        ((FloatBuffer) vertexVBO.clear()).put(tempMeshData, 0, writeIndex).flip();
+        ((FloatBuffer) vertexTranslucentVBO.clear()).put(tempMeshDataTranslucent, 0, writeIndexTranslucent).flip();
         
         // Bind the VBOs
         glBindBuffer(GL_ARRAY_BUFFER, VBOHandle);
@@ -333,7 +328,9 @@ public class Chunk extends Drawable {
         glBufferData(GL_ARRAY_BUFFER, vertexTranslucentVBO, GL_STATIC_DRAW);
         glBindBuffer(GL_ARRAY_BUFFER, 0);
         
+        // set the flags
         built = true;
+        
         System.out.println("Mesh " + indexI + "," + indexJ + " in " + (threadTimer.getCurrentThreadCpuTime() - start) / 1000000000.0);
     }
     

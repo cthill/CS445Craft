@@ -106,11 +106,12 @@ public class WorldGenerator {
         return noiseGen.getNoise(x, y, z );
     }
     
-    private void fillChunkGenerateRandom(Chunk chunk) {
+    public void fillChunkGenerateRandom(Chunk chunk) {
         ThreadMXBean threadTimer = ManagementFactory.getThreadMXBean();
         long start = threadTimer.getCurrentThreadCpuTime();
         
-        VoxelType[][][] blocks = new VoxelType[CHUNK_S][CHUNK_H][CHUNK_S];
+        // format: y, x, z
+        VoxelType[][][] blocks = new VoxelType[CHUNK_H][CHUNK_S][CHUNK_S];
         
         // generate heights for each xz position
         int[][] cellHeights = new int[CHUNK_S][CHUNK_S];
@@ -176,6 +177,7 @@ public class WorldGenerator {
             } else {
                 generateUpperLayer(chunk, blocks, y, cellHeights, biomes);
             }
+            Thread.yield();
         }
         
         chunk.copyBlocks(blocks, 0, CHUNK_S, 0, CHUNK_H, 0, CHUNK_S);
@@ -185,7 +187,7 @@ public class WorldGenerator {
     
     private void generateFlatLayer(VoxelType[][][] blocks, int y, VoxelType type) {
         for (int x = 0; x < CHUNK_S; x++) {
-            Arrays.fill(blocks[x][y], type);
+            Arrays.fill(blocks[y][x], type);
         }
     }
     
@@ -204,7 +206,7 @@ public class WorldGenerator {
         boolean openSpace = (noise < 0.475);
 
         if (!openSpace) {
-            blocks[x][y][z] = VoxelType.STONE;
+            blocks[y][x][z] = VoxelType.STONE;
             
             if (y < DIAMOND_MAX_HEIGHT && rand.nextDouble() < DIAMOND_RATE)
                 generateOreVein(blocks, x, y, z, VoxelType.DIAMOND);
@@ -266,10 +268,10 @@ public class WorldGenerator {
         if (!openSpace) {
             if (y == cellHeight) {
                 // top layer
-                blocks[x][y][z] = VoxelType.GRASS;
+                blocks[y][x][z] = VoxelType.GRASS;
                 geterateGrassFoliage(blocks, x, y, z);
             } else {
-                blocks[x][y][z] = VoxelType.DIRT;
+                blocks[y][x][z] = VoxelType.DIRT;
             }
         }
     }
@@ -292,23 +294,23 @@ public class WorldGenerator {
                     // low top layer
                     float v = (float) (getNoise3d(noiseGenBlockType, noiseX, y, noiseZ) + 1);
                     if (v > 1.05) {
-                        blocks[x][y][z] = VoxelType.SAND;
-                        blocks[x][y+1][z] = VoxelType.SNOW;
+                        blocks[y][x][z] = VoxelType.SAND;
+                        blocks[y+1][x][z] = VoxelType.SNOW;
                     } else if (v > .985) {
-                        blocks[x][y][z] = VoxelType.ICE;
+                        blocks[y][x][z] = VoxelType.ICE;
                     } else {
-                        blocks[x][y][z] = VoxelType.ICE_GRASS;
-                        blocks[x][y+1][z] = VoxelType.SNOW;
+                        blocks[y][x][z] = VoxelType.ICE_GRASS;
+                        blocks[y+1][x][z] = VoxelType.SNOW;
                         generateWinterFoliage(blocks, x, y, z);
                     }
                 } else {
                     // high top layer
-                    blocks[x][y][z] = VoxelType.ICE_GRASS;
-                    blocks[x][y+1][z] = VoxelType.SNOW;
+                    blocks[y][x][z] = VoxelType.ICE_GRASS;
+                    blocks[y+1][x][z] = VoxelType.SNOW;
                     generateWinterFoliage(blocks, x, y, z);
                 }
             } else {
-                blocks[x][y][z] = VoxelType.DIRT;
+                blocks[y][x][z] = VoxelType.DIRT;
             }
         }
     }
@@ -318,21 +320,21 @@ public class WorldGenerator {
         int noiseZ = z + chunk.indexJ * CHUNK_S;
         double v = getNoise2d(noiseGenBlockType, noiseX, noiseZ);
         if (v > 0.45) {
-            blocks[x][y][z] = VoxelType.SAND;
+            blocks[y][x][z] = VoxelType.SAND;
             if (y == cellHeight) {
                 generateWetSandFoliage(blocks, x, y, z); 
             }
         } else {
             if (y == cellHeight) {
-                blocks[x][y][z] = VoxelType.WATER;
+                blocks[y][x][z] = VoxelType.WATER;
             } else {
-                blocks[x][y][z] = VoxelType.DIRT;
+                blocks[y][x][z] = VoxelType.DIRT;
             }
         }
     }
     
     private void generateCellDesertBiome(Chunk chunk, VoxelType[][][] blocks, int x, int y, int z, int cellHeight, int rockyCutoff) {
-        blocks[x][y][z] = VoxelType.SAND;
+        blocks[y][x][z] = VoxelType.SAND;
         if (y == cellHeight) {
             generateDesertFoliage(blocks, x, y, z);
         }
@@ -374,17 +376,17 @@ public class WorldGenerator {
     
     private void geterateGrassFoliage(VoxelType[][][] blocks, int x, int y, int z) {
         if (rand.nextDouble() < 0.05) 
-            blocks[x][y+1][z] = VoxelType.TALL_GRASS;
+            blocks[y+1][x][z] = VoxelType.TALL_GRASS;
         if (rand.nextDouble() < 0.0040)
-            blocks[x][y+1][z] = VoxelType.RED_FLOWER;
+            blocks[y+1][x][z] = VoxelType.RED_FLOWER;
         if (rand.nextDouble() < 0.0040)
-            blocks[x][y+1][z] = VoxelType.YELLOW_FLOWER;
+            blocks[y+1][x][z] = VoxelType.YELLOW_FLOWER;
         if (rand.nextDouble() < 0.001)
-            blocks[x][y+1][z] = VoxelType.PUMPKIN;
+            blocks[y+1][x][z] = VoxelType.PUMPKIN;
         if (rand.nextDouble() < 0.001)
-            blocks[x][y+1][z] = VoxelType.RED_MUSHROOM;
+            blocks[y+1][x][z] = VoxelType.RED_MUSHROOM;
         if (rand.nextDouble() < 0.001)
-            blocks[x][y+1][z] = VoxelType.MUSHROOM;
+            blocks[y+1][x][z] = VoxelType.MUSHROOM;
         if (rand.nextDouble() < 0.0015)
             generateTree(blocks, x, y + 1, z, false);
     }
@@ -396,13 +398,13 @@ public class WorldGenerator {
             int min = 2;
             int height = rand.nextInt(max - min + 1) + min;
             for (int i = 1; i <= height; i++) {
-                blocks[x][y+i][z] = VoxelType.REED;
+                blocks[y+i][x][z] = VoxelType.REED;
             }
         }
     }
     
     private void generateWinterFoliage(VoxelType[][][] blocks, int x, int y, int z) {
-        blocks[x][y+1][z] = VoxelType.SNOW;
+        blocks[y+1][x][z] = VoxelType.SNOW;
         if (rand.nextDouble() < 0.0015)
             generateTree(blocks, x, y + 1, z, true);
     }
@@ -414,7 +416,7 @@ public class WorldGenerator {
             int min = 3;
             int height = rand.nextInt(max - min + 1) + min;
             for (int i = 1; i <= height; i++) {
-                blocks[x][y+i][z] = VoxelType.CACTUS;
+                blocks[y+i][x][z] = VoxelType.CACTUS;
             }
         }
     }
@@ -496,53 +498,39 @@ public class WorldGenerator {
             int yy = blockCoords[i + 1];
             int zz = blockCoords[i + 2];
             if (
-                xx >= 0 && xx < blocks.length &&
-                yy >= 0 && yy < blocks[xx].length &&
-                zz >= 0 && zz < blocks[xx][yy].length
+                yy >= 0 && yy < blocks.length &&
+                xx >= 0 && xx < blocks[yy].length &&
+                zz >= 0 && zz < blocks[yy][xx].length
             ) {
-                if (blocks[xx][yy][zz] != VoxelType.BEDROCK) {
-                    blocks[xx][yy][zz] = type;
+                if (blocks[yy][xx][zz] != VoxelType.BEDROCK) {
+                    blocks[yy][xx][zz] = type;
                 }
             }
         }
     }
     
-    public List<Runnable> generateNewChunksIfNeeded(int i, int j, int distance, Screen screen) {
-        List<Runnable> newTasks = new ArrayList<>();
+    public List<Chunk> createNewChunksIfNeeded(int i, int j, int distance, Screen screen) {
         List<Chunk> newChunks = new ArrayList<>();
         for (int d = 1; d <= distance; d++) {
             for (int di = -d; di <= d; di++) {
-                addChunkGenerationTask(i + di, j + d, newTasks, newChunks, screen);
-                addChunkGenerationTask(i + di, j - d, newTasks, newChunks, screen);
+                createChunk(i + di, j + d, newChunks, screen);
+                createChunk(i + di, j - d, newChunks, screen);
             }
             for (int dj = -d; dj <= d; dj++) {
-                addChunkGenerationTask(i + d, j + dj, newTasks, newChunks, screen);
-                addChunkGenerationTask(i - d, j + dj, newTasks, newChunks, screen);
+                createChunk(i + d, j + dj, newChunks, screen);
+                createChunk(i - d, j + dj, newChunks, screen);
             }
-            
-            newChunks.forEach(chunk -> {
-                // make sure adjacent chunks are rebuilt
-                world.findAllAdjacentChunks(chunk).forEach(adjChunk -> {
-                    adjChunk.setDirty(true);
-                });
-            });
         }
-        return newTasks;
+        
+        return newChunks;
     }
     
-    private void addChunkGenerationTask(int i, int j, List<Runnable> newTasks, List<Chunk> newChunks, Screen screen) {
+    private void createChunk(int i, int j, List<Chunk> newChunks, Screen screen) {
         if (world.getChunk(i, j) == null) {
             Chunk c = createChunk(i, j);
             newChunks.add(c);
             world.addChunk(c);
             screen.addObject(c);
-            
-            // generate the chunk later
-            newTasks.add((Runnable) () -> {
-                fillChunkGenerateRandom(c);
-                c.setGenerated();
-                c.setDirty(true);
-            });
         }
     }
 }

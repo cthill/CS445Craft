@@ -3,8 +3,12 @@ package cs445craft;
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.IOException;
+import java.util.LinkedList;
 import java.util.List;
+import java.util.Queue;
 import java.util.Random;
+import java.util.concurrent.LinkedBlockingQueue;
+import java.util.concurrent.BlockingQueue;
 import org.lwjgl.LWJGLException;
 import org.lwjgl.input.Keyboard;
 import org.lwjgl.input.Mouse;
@@ -16,7 +20,7 @@ public class Game {
     public static final int RES_HEIGHT = 768;
     
     // game constants
-    private static int CHUNK_GENERATION_BOUNDARY = 2;
+    private static int CHUNK_GENERATION_BOUNDARY = 4;
     private static final int INITIAL_WORLD_SIZE = CHUNK_GENERATION_BOUNDARY * 2 + 1;
     private static final boolean DYNAMIC_WORLD_GENERATION = true;
     private static final float MOUSE_SENS = 0.09f;
@@ -34,11 +38,14 @@ public class Game {
     private float yspeed;
     
     private final Random rand;
-    private final TaskQueue taskQueue;
+    private final Queue<Runnable> taskQueue;
     private final WorldGenerator worldGen;
     private final World world;
     private final Camera camera;
     private final Screen screen;
+    
+    private final BlockingQueue<Chunk> ungeneratedChunkQueue;
+    private final Thread chunkGenerator;
     
     public Game() throws LWJGLException, IOException {        
         // init camera and screen
@@ -54,10 +61,14 @@ public class Game {
         rand = new Random();
         worldGen = new WorldGenerator(rand.nextInt(), INITIAL_WORLD_SIZE);
         world = worldGen.getOrGenerate();
-        taskQueue = new TaskQueue();
+        taskQueue = new LinkedList<>();
         
         screen.addObjects(world.getChunks());
         
+        // setup the chunk generation thread
+        ungeneratedChunkQueue = new LinkedBlockingQueue<Chunk>();
+        chunkGenerator = new ChunkGenerator(ungeneratedChunkQueue);
+                
         init();
     }
     
@@ -68,6 +79,8 @@ public class Game {
     }
     
     public void run() {
+        chunkGenerator.start();
+        
         while(true) {
             // listen for q key or closeRequested
             if (Keyboard.isKeyDown(Keyboard.KEY_ESCAPE) || Keyboard.isKeyDown(Keyboard.KEY_Q)) {
@@ -84,20 +97,26 @@ public class Game {
             checkPlayerStatus();
             
             // run one async task
-            taskQueue.run(1);            
+            Runnable task = taskQueue.poll();
+            if (task != null) {
+                task.run();
+            }
+            
             // draw frame
             screen.drawFrame();
             
             // the screen will mark drawn chunks as active
             world.getChunks().stream().filter(chunk -> chunk.getActive() && chunk.getGenerated() && chunk.getDirty() && !chunk.getScheduledForRebuild()).forEach(chunk -> {
                 chunk.setScheduledForRebuild(true);
-                taskQueue.addTask(() -> {
+                taskQueue.add(() -> {
                     chunk.rebuildMesh();
                     chunk.setDirty(false);
                     chunk.setScheduledForRebuild(false);
                 });
             });
         }
+        
+        ((ChunkGenerator) chunkGenerator).terminate();
     }
     
     private void updateWorldPos() {
@@ -124,13 +143,13 @@ public class Game {
         }
 
         if (gridPositionUpdated || chunkPositionUpdated) {
-            System.out.println("pos (" + worldX + "," + worldZ + ") chunk (" + chunkI + "," + chunkJ + ")");
+//            System.out.println("pos (" + worldX + "," + worldZ + ") chunk (" + chunkI + "," + chunkJ + ")");
             //screen.moveWorldLight(worldX * Voxel.BLOCK_SIZE, -worldZ * Voxel.BLOCK_SIZE);
         }
 
         if (chunkPositionUpdated && DYNAMIC_WORLD_GENERATION) {
-            List<Runnable> chunkGenerationTasks = worldGen.generateNewChunksIfNeeded(chunkI, chunkJ, CHUNK_GENERATION_BOUNDARY, screen);
-            taskQueue.addTasks(chunkGenerationTasks);
+            List<Chunk> newChunks = worldGen.createNewChunksIfNeeded(chunkI, chunkJ, CHUNK_GENERATION_BOUNDARY, screen);
+            ungeneratedChunkQueue.addAll(newChunks);
         }
     }
     
@@ -327,11 +346,42 @@ public class Game {
     private void checkPlayerStatus() {
         Voxel.VoxelType blockAtCamera = world.blockAt(camera.x, camera.y, camera.z);
         
-        // check if underwater
         if (blockAtCamera == Voxel.VoxelType.WATER) {
+            // if underwater, tint the screen blue
             screen.setTintColor(0.75f, 0.75f, 1.0f);
         } else {
             screen.setTintColor(1.0f, 1.0f, 1.0f);
+        }
+    }
+    
+    
+    private class ChunkGenerator extends Thread {
+        private boolean done;
+        private final BlockingQueue<Chunk> ungeneratedChunkQueue;
+        
+        ChunkGenerator(BlockingQueue<Chunk> ungenQueue) {
+            this.done = false;
+            this.ungeneratedChunkQueue = ungenQueue;
+        }
+        
+        public void terminate() {
+            done = true;
+        }
+        
+        public void run() {
+            while (!done) {
+                Chunk chunkToFill = ungeneratedChunkQueue.poll();
+                if (chunkToFill == null) {
+                    continue;
+                }
+                
+                worldGen.fillChunkGenerateRandom(chunkToFill);
+                chunkToFill.setGenerated();
+                chunkToFill.setDirty(true);
+                world.findAllAdjacentChunks(chunkToFill).forEach(adjChunk -> {
+                    adjChunk.setDirty(true);
+                });
+            }
         }
     }
 }

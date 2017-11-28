@@ -39,8 +39,8 @@ public class Screen {
     private Font awtFont;
     private TrueTypeFont font;
     
-//    private FloatBuffer lightPosition;
-//    private FloatBuffer lightColor;
+    private FloatBuffer lightPosition;
+    private FloatBuffer lightColor;
     
     public Screen(int width, int height, String title, Camera camera) throws LWJGLException {
         this.width = width;
@@ -64,18 +64,16 @@ public class Screen {
         glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
         glFrontFace(GL_CW);
         
-//        lightPosition = BufferUtils.createFloatBuffer(4);
-//        lightPosition.put(0).put((Chunk.CHUNK_H + 5) * Voxel.BLOCK_SIZE).put(0).put(1.0f).flip();
-//        lightColor = BufferUtils.createFloatBuffer(4);
-//        lightColor.put(1.0f).put(1.0f).put(1.0f).put(1.0f).flip();        
+        lightPosition = BufferUtils.createFloatBuffer(4);
+        lightPosition.put(0).put((Chunk.CHUNK_H + 5) * Voxel.BLOCK_SIZE).put(0).put(1.0f).flip();
+        lightColor = BufferUtils.createFloatBuffer(4);
+        lightColor.put(1.0f).put(1.0f).put(1.0f).put(1.0f).flip();        
 
-//        awtFont = new Font("Times New Roman", Font.PLAIN, 24);
-//        font = new TrueTypeFont(awtFont, false);
     }
     
     public void moveLight(float x, float y, float z) {
-//        lightPosition = BufferUtils.createFloatBuffer(4);
-//        lightPosition.put(x).put(y).put(z).put(1.0f).flip();
+        lightPosition = BufferUtils.createFloatBuffer(4);
+        lightPosition.put(x).put(y).put(z).put(1.0f).flip();
     }
 
     /**
@@ -132,12 +130,12 @@ public class Screen {
         glPushMatrix();
         camera.lookThrough();
         
-//        glEnable(GL_LIGHTING);//enables our lighting
-//        glLight(GL_LIGHT0, GL_POSITION, lightPosition);
-//        glLight(GL_LIGHT0, GL_SPECULAR, lightColor);
-//        glLight(GL_LIGHT0, GL_DIFFUSE, lightColor);
-//        glLight(GL_LIGHT0, GL_AMBIENT, lightColor);
-//        glEnable(GL_LIGHT0);
+        glEnable(GL_LIGHTING);//enables our lighting
+        glLight(GL_LIGHT0, GL_POSITION, lightPosition);
+        glLight(GL_LIGHT0, GL_SPECULAR, lightColor);
+        glLight(GL_LIGHT0, GL_DIFFUSE, lightColor);
+        glLight(GL_LIGHT0, GL_AMBIENT, lightColor);
+        glEnable(GL_LIGHT0);
 
         // 3d draw solid objects
         glEnable(GL_ALPHA_TEST);
@@ -169,7 +167,7 @@ public class Screen {
         // 3d draw finish
         glPopMatrix();
         glColor3f(1.0f,1.0f,1.0f);
-//        glDisable(GL_LIGHTING);
+        glDisable(GL_LIGHTING);
     }
     
     private void render2D() {
@@ -203,11 +201,7 @@ public class Screen {
             glVertex2f(0,-4);
         glEnd();
         glPopMatrix();
-        
-        
-//        font = new TrueTypeFont(awtFont, false);
-//        font.drawString(0,0, "TESTING", Color.yellow);
-        
+
         // update display and sync to 60 hz.
         Display.update();
         Display.sync(60);

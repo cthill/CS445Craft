@@ -18,8 +18,8 @@ public class Game {
     public static final int ASYNC_TASKS_PER_FRAME = 2;
     
     // game constants
-    private static int CHUNK_GENERATION_BOUNDARY = 4;
-    private static final int INITIAL_WORLD_SIZE = CHUNK_GENERATION_BOUNDARY * 2 + 1;
+    private static int CHUNK_GENERATION_BOUNDARY = 3;
+    private static final int INITIAL_WORLD_SIZE = 4;
     private static final boolean DYNAMIC_WORLD_GENERATION = true;
     private static final float MOUSE_SENS = 0.09f;
     private static final float MOVEMENT_SPEED = .20f;
@@ -52,6 +52,7 @@ public class Game {
         float top = Chunk.CHUNK_H * Voxel.BLOCK_SIZE;
         camera = new Camera(center, top, center);
         screen = new Screen(RES_WIDTH, RES_HEIGHT, "CS445Craft", camera);
+        screen.moveLight(center + Chunk.CHUNK_S * Voxel.BLOCK_SIZE, top, center);
         
         // load texture
         TextureLoader.getTexture("png", new FileInputStream(new File("res/terrain.png")));
@@ -79,61 +80,94 @@ public class Game {
     }
     
     private void init() {
+        Thread.currentThread().setPriority(Thread.MAX_PRIORITY);
         Mouse.setGrabbed(true);
         chunkI = -1;
         chunkJ = -1;
     }
     
     public void run() {
-        chunkGenerator.start();
-        meshBuilder.start();
-        
-        while(true) {
-            // listen for q key or closeRequested
-            if (Keyboard.isKeyDown(Keyboard.KEY_ESCAPE) || Keyboard.isKeyDown(Keyboard.KEY_Q)) {
-                screen.close();
-                break;
-            }
-            if (screen.getCloseRequested()) {
-                break;
-            }
-            
-            updateWorldPos();
-            mouseEvents();
-            keyboardEvents();
-            checkPlayerStatus();
-            
-            // run one async task
-            for (int i = 0; i < ASYNC_TASKS_PER_FRAME; i++) {
-                Runnable task = taskQueue.poll();
-                if (task == null) {
+        try {
+            // start the chunkGenerator and meshBuilder background threads
+            chunkGenerator.start();
+            meshBuilder.start();
+
+            // main game loop
+            while(true) {
+                // listen for q key or closeRequested
+                if (Keyboard.isKeyDown(Keyboard.KEY_ESCAPE) || Keyboard.isKeyDown(Keyboard.KEY_Q)) {
+                    screen.close();
                     break;
                 }
-                task.run();
-            }
-            
-            // draw frame
-            screen.drawFrame();
-            
-            // the screen will mark drawn chunks as active
-            world.getChunks().stream().filter(chunk -> chunk.getActive() && chunk.getGenerated() && chunk.getDirty() && !scheduledForRebuild.contains(chunk)).forEach(chunk -> {
-                scheduledForRebuild.add(chunk);
-                taskQueue.add(() -> {
-                    unbuiltChunkQueue.add(chunk);
+                if (screen.getCloseRequested()) {
+                    break;
+                }
+                
+                // check if player entered a new voxel/chunk
+                updateWorldPos();
+                // handle mouse events
+                mouseEvents();
+                // handle keyboard events
+                keyboardEvents();
+                // do world movement and collision detection
+                worldMovement();
+                // check misc player status
+                checkPlayerStatus();
+
+                /*
+                Poll the taskQueue for async tasks that need to be completed. We
+                limit the number of async tasks that will be run per frame to
+                ASYNC_TASKS_PER_FRAME so that there are no studders or lag during
+                gameplay.
+                */
+                for (int i = 0; i < ASYNC_TASKS_PER_FRAME; i++) {
+                    Runnable task = taskQueue.poll();
+                    if (task == null) {
+                        break;
+                    }
+                    task.run();
+                }
+
+                // draw one frame frame
+                screen.drawFrame();
+
+                /*
+                find all chunks that are:
+                  1. active (within the screen's draw distance)
+                  2. generated (the WorldGenerator has filled them with voxels)
+                  3. dirty (the mesh needs to be rebuilt)
+                  4. not already scheduled to be rebuilt
+                
+                Take these chunks and add them to the unbuiltChunkQueue. This will
+                cause the MeshBuilder thread to rebuild the chunk mesh in the
+                background.
+                */
+                world.getChunks().stream().filter(chunk -> chunk.getActive() && chunk.getGenerated() && chunk.getDirty() && !scheduledForRebuild.contains(chunk)).forEach(chunk -> {
+                    scheduledForRebuild.add(chunk);
+                    taskQueue.add(() -> {
+                        unbuiltChunkQueue.add(chunk);
+                    });
                 });
-            });
-            
-            while (!builtChunkQueue.isEmpty()) {
-                Chunk chunk = builtChunkQueue.poll();
-                taskQueue.add(() -> {
-                    chunk.copyMeshToVBO();
-                    scheduledForRebuild.remove(chunk);
-                });
+
+                /*
+                Once the MeshBuilder thread is finished building the mesh, it will
+                place the chunk in the builtChunkQueue. Now we need to take the
+                chunk and generate an async task to copy the new mesh data into
+                a VBO for OpenGL to use. We can't do this in the MeshBuilder thread
+                because it dones't have a GL context.
+                */
+                while (!builtChunkQueue.isEmpty()) {
+                    Chunk chunk = builtChunkQueue.poll();
+                    taskQueue.add(() -> {
+                        chunk.copyMeshToVBO();
+                        scheduledForRebuild.remove(chunk);
+                    });
+                }
             }
+        } finally {
+            ((ChunkGenerator) chunkGenerator).terminate();
+            ((MeshBuilder) meshBuilder).terminate();
         }
-        
-        ((ChunkGenerator) chunkGenerator).terminate();
-        ((MeshBuilder) meshBuilder).terminate();
     }
     
     private void updateWorldPos() {
@@ -238,8 +272,6 @@ public class Game {
         } else {
             lastDownState = false;
         }
-
-        worldMovement();
     }
     
     private void worldMovement() {
@@ -355,8 +387,6 @@ public class Game {
         camera.x += dx;
         camera.z += dz;
         camera.y += dy;
-        
-        screen.moveLight(camera.x, camera.y, camera.z);
     }
     
     private void checkPlayerStatus() {
@@ -403,7 +433,6 @@ public class Game {
             }
         }
     }
-    
     
     private class MeshBuilder extends Thread {
         private boolean done;

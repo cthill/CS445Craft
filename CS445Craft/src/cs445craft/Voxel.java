@@ -538,9 +538,6 @@ public class Voxel {
         };
     }
     
-    
-    
-    
     private static int[] getTextureCoords(VoxelType v) {
         int topX, btmX, fntX, bckX, lftX, rhtX;
         int topY, btmY, fntY, bckY, lftY, rhtY;

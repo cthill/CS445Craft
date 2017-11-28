@@ -5,7 +5,6 @@
  */
 package cs445craft;
 
-import static cs445craft.Chunk.CHUNK_H;
 import static cs445craft.Chunk.CHUNK_S;
 import cs445craft.Voxel.VoxelType;
 import java.util.ArrayList;

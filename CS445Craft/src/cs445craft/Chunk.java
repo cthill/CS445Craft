@@ -4,12 +4,12 @@
 * class: CS 445 – Computer Graphics
 *
 * assignment: Final Project
-* date last modified: 10/16/2017
+* date last modified: 10/27/2017
 *
-* purpose: This class defines one 30x30x30 chunk of voxels. The
-* contents of the chunk are randomly generated using simplex noise.
-* The class uses a 3d array of the enum VoxelType to keep track of
-* which blocks are in each cell. null entries indicate empty cells.
+* purpose: This class defines one 30x30x90 chunk of voxels. The class uses a 3d
+* array of the enum VoxelType to keep track of which blocks are in each cell.
+* Null entries indicate empty cells. This class is also responsible for building
+* a mesh and rendering that mesh using VBOs.
 * 
 ****************************************************************/
 
@@ -54,29 +54,67 @@ public class Chunk extends Drawable {
         chunkZ = indexJ * CHUNK_S * Voxel.BLOCK_SIZE;
         chunkY = 0.0f;
         
-        // ordering: y, x, z
+        /*
+        The ordering of the blocks array is [y][x][z]. The reason for doing this
+        is because the WorldGenerator was easier to design if we iterate first on
+        the y-axis and then on the x and z axiis. If we iterate in the same way
+        the array is structured, we get better cache locality and hopefully better
+        performance.
+        */
         blocks = new VoxelType[CHUNK_H][CHUNK_S][CHUNK_S];
 
         VBOHandle = glGenBuffers();
         VBOHandleTranslucent = glGenBuffers();
     }
     
+    /**
+    * method: getDirty()
+    * purpose: Returns the state of the dirty flag. Chunks are marked as "dirty"
+    * when the mesh has been modified and needs to be rebuilt. The rebuildMesh()
+    * methods clears the dirty flag.
+    * 
+    * The Game.java class checks for dirty chunks and adds them to a queue to be
+    * rebuilt.
+    **/
     public boolean getDirty() {
         return dirty;
     }
     
+    /**
+    * method: setDirty()
+    * purpose: Mark this chunk as dirty so its mesh will be rebuilt. The chunk
+    * becomes "dirty" when a block is broken or a new adjacent chunk is created
+    * by the WorldGenerator.
+    **/
     public void setDirty() {
         this.dirty = true;
     }
     
+    /**
+    * method: getGenerated()
+    * purpose: Returns the state of the generated flag. The generated flag is set
+    * to true when the WorldGenerator has generated and filled the contents of this
+    * chunk.
+    **/
     public boolean getGenerated() {
         return generated;
     }
     
+    /**
+    * method: setGenerated()
+    * purpose: Sets the generated flag to true. This method is called by the WorldGenerator
+    * after the contents of this chunk have been generated.
+    * chunk.
+    **/
     public void setGenerated() {
         this.generated = true;
     }
     
+    
+    /**
+    * method: copyBlocks()
+    * purpose: Copy a 3d array of VoxelType into this instance's blocks array.
+    **/
     public void copyBlocks(VoxelType[][][] wBlocks, int sx, int lx, int sy, int ly, int sz, int lz) {
         if (ly > CHUNK_H)
             ly = CHUNK_H;
@@ -117,10 +155,22 @@ public class Chunk extends Drawable {
         return null;
     }
     
+    /**
+    * method: blockAt()
+    * purpose: Returns the VoxelType at a given x,y,z in the blocks array.
+    * 
+    **/
     public VoxelType blockAt(int x, int y, int z) {
         return voxelLookupSafe(x, y, z);
     }
     
+    /**
+    * method: solidBlockAt()
+    * purpose: Returns the VoxelType at a given x,y,z in the blocks array. Return
+    * null if the voxel at that location is not solid. Uses Voxel.isSolid() to
+    * determine if the voxel is solid.
+    * 
+    **/
     public VoxelType solidBlockAt(int x, int y, int z) {
         VoxelType block = voxelLookupSafe(x, y, z);
         if (!Voxel.isSolid(block)) {
@@ -129,6 +179,12 @@ public class Chunk extends Drawable {
         return block;
     }
     
+    /**
+    * method: depthAt()
+    * purpose: Returns the y-value of the nearest solid voxel to a given x, y, z
+    * in the blocks array. Useful for collision checking.
+    * 
+    **/
     public int depthAt(int x, int y, int z) {
         for (int i = y; i >= 0; i--) {
             VoxelType block = voxelLookupSafe(x, i, z);
@@ -140,6 +196,12 @@ public class Chunk extends Drawable {
         return CHUNK_H;
     }
     
+    /**
+    * method: traverseChunks()
+    * purpose: Returns the chunk at a given x,y,z location in the blocks array.
+    * traverseChunks(0,0,0) will return this chunk. traverseChunks(CHUNK_S,0,0)
+    * will return the adjacent chunk in the positive x direction.
+    **/
     public Chunk traverseChunks(int x, int y, int z) {
         if (y < 0 || y > CHUNK_H - 1) {
             return null;
@@ -167,10 +229,17 @@ public class Chunk extends Drawable {
         return world.findAdjacentChunk(this, xDir, zDir);
     }
     
-    public VoxelType voxelLookupTraverseChunks(int x, int y, int z, VoxelType defaultIfNull) {
+    /**
+    * method: voxelLookupTraverseChunks()
+    * purpose: Lookup a VoxelType at a given x, y, z position in the blocks array.
+    * Traverses chunk boundaries if out-of-bounds values are provided. Allows user
+    * to provide a default value if a boundary is crossed but there is no adjacent
+    * chunk.
+    **/
+    public VoxelType voxelLookupTraverseChunks(int x, int y, int z, VoxelType defaultIfNullChunk) {
         Chunk lookupChunk = traverseChunks(x, y, z);
         if (lookupChunk == null) {
-            return defaultIfNull;
+            return defaultIfNullChunk;
         }
         
         int wrappedX = Math.floorMod(x, CHUNK_S);
@@ -179,12 +248,24 @@ public class Chunk extends Drawable {
         return lookupChunk.blocks[y][wrappedX][wrappedZ]; //voxelLookupSafe(wrappedX, y, wrappedZ);
     }
     
+    /**
+    * method: voxelLookupTraverseChunks()
+    * purpose: Lookup a VoxelType at a given x, y, z position in the blocks array.
+    * Traverses chunk boundaries if out-of-bounds values are provided. Returns null
+    * if a boundary is crossed but there is no adjacent chunk.
+    **/
     public VoxelType voxelLookupTraverseChunks(int x, int y, int z) {
         return voxelLookupTraverseChunks(x, y, z, null);
     }
     
-    
-
+    /**
+    * method: breakBlock()
+    * purpose: Remove a voxel at a given x, y, z position in the blocks array and
+    * rebuild the mesh. If a block is broken at a chunk boundary, the adjacent chunk
+    * is marked as dirty so it will also be rebuilt. If the above voxels satisfy
+    * the Voxel.breakIfSupportRemoved() function, they will also be removed.
+    * 
+    **/
     public void breakBlock(int x, int y, int z) {
         VoxelType v = voxelLookupSafe(x, y, z);
         if (v != null) {
@@ -218,7 +299,6 @@ public class Chunk extends Drawable {
                 Chunk adjacent = world.findAdjacentChunk(this, xDir, 0);
                 if (adjacent != null) {
                     adjacent.setDirty();
-                    //adjacent.rebuildMesh();
                 }
             }
             
@@ -227,8 +307,6 @@ public class Chunk extends Drawable {
                 Chunk adjacent = world.findAdjacentChunk(this, 0, zDir);
                 if (adjacent != null) {
                     adjacent.setDirty();
-                    //adjacent.rebuildMesh();
-                    //adjacent.copyMeshToVBO();
                 }
             }
         }
@@ -239,8 +317,19 @@ public class Chunk extends Drawable {
     * purpose: Loop over the blocks array to build a 3d mesh of the chunk to
     * render to the screen. Faces that can not be see will not be included in
     * the mesh.
+    * 
+    * This method builds two meshes: one for opaque voxels and another for translucent
+    * voxels. This is because the screen needs to draw the opaque meshes before
+    * the translucent ones.
+    * 
+    * Mesh data is rendered to temporary float arrays. The copyMeshToVBO() copies
+    * the data out of the temporary array to create the VBOs. The reason for a two
+    * step generation process is so that rebuildMesh() can be done on a background
+    * thread to prevent lag/stuttering. However copyMeshToVBO() must be done on
+    * the main thread because that thread has the OpenGL context.
     **/
     public void rebuildMesh() {
+        // create a timer
         ThreadMXBean threadTimer = ManagementFactory.getThreadMXBean();
         long start = threadTimer.getCurrentThreadCpuTime();
         
@@ -271,6 +360,7 @@ public class Chunk extends Drawable {
                         continue;
                     }
                     
+                    // lookup all 6 adjacent voxels, traversing chunk boundaries if needed.
                     VoxelType above = voxelLookupTraverseChunks(x, y + 1, z, VoxelType.BEDROCK);
                     VoxelType below = voxelLookupTraverseChunks(x, y - 1, z, VoxelType.BEDROCK);
                     VoxelType front = voxelLookupTraverseChunks(x, y, z - 1, VoxelType.BEDROCK);
@@ -299,10 +389,12 @@ public class Chunk extends Drawable {
                     for (int face = 0; face < 6; face++) {
                         if (faceVisible[face]) {
                             if (translucentTexture) {
+                                // write to the translucent buffer
                                 Voxel.writeFaceVertices(tempMeshDataTranslucent, writeIndexTranslucent, face, voxelType, x, y, z);
                                 writeIndexTranslucent += floatsPerFace;
                                 tempNumFacesTranslucent++;
                             } else {
+                                // write to the opaque buffer
                                 Voxel.writeFaceVertices(tempMeshData, writeIndex, face, voxelType, x, y, z);
                                 writeIndex += floatsPerFace;
                                 tempNumFaces++;
@@ -311,26 +403,38 @@ public class Chunk extends Drawable {
                     }
                 }
             }
-            
+            // yeild after each vertical layer so that mesh building doesn't cause stuttering
             Thread.yield();
         }
         
+        // print out how long it took to build the mesh
         System.out.println("MeshBuild " + indexI + "," + indexJ + " in " + (threadTimer.getCurrentThreadCpuTime() - start) / 1000000000.0);
     }
     
+    /**
+    * method: copyMeshToVBO()
+    * purpose: Copy the data in the tempMeshData and tempMeshDataTranslucent arrays
+    * to VBOs. This must be done only after rebuildMesh() is called.
+    **/
     public void copyMeshToVBO() {
+        // make sure rebuildMesh() was called first.
+        if (tempMeshData == null || tempMeshDataTranslucent == null) {
+            return;
+        }
+        
+        // create timer
         ThreadMXBean threadTimer = ManagementFactory.getThreadMXBean();
         long start = threadTimer.getCurrentThreadCpuTime();
         
-        // create VBOs
+        // create FloatBuffers
         FloatBuffer vertexVBO = BufferUtils.createFloatBuffer(writeIndex);
         FloatBuffer vertexTranslucentVBO = BufferUtils.createFloatBuffer(writeIndexTranslucent);
         
-        // copy float data to VBOs
+        // copy float data to FloatBuffers
         ((FloatBuffer) vertexVBO.clear()).put(tempMeshData, 0, writeIndex).flip();
         ((FloatBuffer) vertexTranslucentVBO.clear()).put(tempMeshDataTranslucent, 0, writeIndexTranslucent).flip();
         
-        // Bind the VBOs
+        // Load FloatBuffers data into VBOs
         glBindBuffer(GL_ARRAY_BUFFER, VBOHandle);
         glBufferData(GL_ARRAY_BUFFER, vertexVBO, GL_STATIC_DRAW);
         glBindBuffer(GL_ARRAY_BUFFER, VBOHandleTranslucent);
@@ -345,6 +449,7 @@ public class Chunk extends Drawable {
         tempMeshData = null;
         tempMeshDataTranslucent = null;
         
+        // print how long it took
         System.out.println("MeshVBOCopy " + indexI + "," + indexJ + " in " + (threadTimer.getCurrentThreadCpuTime() - start) / 1000000000.0);
         
         // set the flags
@@ -352,6 +457,11 @@ public class Chunk extends Drawable {
         built = true;
     }
     
+    /**
+    * method: shouldDrawFace()
+    * purpose: Examines two adjacent VoxelTypes and determines if the
+    * mating face of the fist Voxel should be drawn.
+    **/
     private boolean shouldDrawFace(VoxelType v, VoxelType adjacent) {
         if (adjacent == null) {
             return true;
@@ -370,19 +480,26 @@ public class Chunk extends Drawable {
     
     /**
     * method: draw()
-    * purpose: Use vertex buffers to draw the pre-built textured mesh to the
-    * screen.
+    * purpose: Draw the pre-built textured mesh of opaque voxels to the screen.
     **/
     @Override
     public void draw() {
         drawVBO(VBOHandle, numFaces);
     }
     
+    /**
+    * method: drawTranslucent()
+    * purpose: Draw the pre-built textured mesh of translucent voxels to the screen.
+    **/
     @Override
     public void drawTranslucent() {
         drawVBO(VBOHandleTranslucent, numFacesTranslucent);
     }
     
+    /**
+    * method: drawVBO()
+    * purpose: Draw a given VBO to the screen.
+    **/
     private void drawVBO(int VBO, int faces) {
         if (!built) {
             return;
@@ -409,21 +526,42 @@ public class Chunk extends Drawable {
         glDisableClientState (GL_TEXTURE_COORD_ARRAY);
     }
     
+    /**
+    * method: distanceTo()
+    * purpose: Calculate the 3d distance from the center of this chunk to some given
+    * point. These coordinates are in OpenGL space, relative to the OpenGl origin.
+    **/
     @Override
     public float distanceTo(float x, float y, float z) {
         return (float) Math.sqrt(Math.pow(chunkX + CHUNK_S - x, 2) + Math.pow(chunkY + CHUNK_H - y, 2) + Math.pow(chunkZ + CHUNK_S - z, 2));
     }
     
+    /**
+    * method: getX()
+    * purpose: Get the x coordinate of this chunk, in OpenGL space, relative to
+    * the OpenGl origin.
+    **/
     @Override
     public float getX() {
         return chunkX;
     }
     
+    
+    /**
+    * method: getY()
+    * purpose: Get the y coordinate of this chunk, in OpenGL space, relative to
+    * the OpenGl origin.
+    **/
     @Override
     public float getY() {
         return chunkY;
     }
     
+    /**
+    * method: getZ()
+    * purpose: Get the z coordinate of this chunk, in OpenGL space, relative to
+    * the OpenGl origin.
+    **/
     @Override
     public float getZ() {
         return chunkZ;

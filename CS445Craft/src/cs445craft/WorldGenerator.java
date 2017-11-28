@@ -37,9 +37,11 @@ public class WorldGenerator {
     private static final int ORE_VEIN_MIN = 1;
     private static final int ORE_VEIN_MAX = 8;
     
+    private static final int NOISE_OFFSET_X = 0;
+    private static final int NOISE_OFFSET_Z = 0;
     private static final int NOISE_FACTOR_HEIGHT = 10;
-    private static final int NOISE_FACTOR_LOCAL_HEIGHT = 2;
-    private static final int NOISE_FACTOR_REGION_HEIGHT = 14;
+    private static final int NOISE_FACTOR_LOCAL_HEIGHT = 5;
+    private static final int NOISE_FACTOR_REGION_HEIGHT = 5;
 
     private final int initialSize;
     private final Random rand;
@@ -98,12 +100,12 @@ public class WorldGenerator {
         return new Chunk(world, i, j);
     }
     
-    private double getNoise2d(SimplexNoise noiseGen, int x, int y) {
-        return noiseGen.getNoise(x, y);
+    private double getNoise2d(SimplexNoise noiseGen, int x, int z) {
+        return noiseGen.getNoise(x + NOISE_OFFSET_X, z + NOISE_OFFSET_Z);
     }
     
     private double getNoise3d(SimplexNoise noiseGen, int x, int y, int z) {
-        return noiseGen.getNoise(x, y, z );
+        return noiseGen.getNoise(x + NOISE_OFFSET_X, y, z + NOISE_OFFSET_Z);
     }
     
     public void fillChunkGenerateRandom(Chunk chunk) {

@@ -23,7 +23,7 @@ public class Game {
     private static final boolean DYNAMIC_WORLD_GENERATION = true;
     private static final float MOUSE_SENS = 0.09f;
     private static final float MOVEMENT_SPEED = .20f;
-    private static final float NOCLIP_SPEED = MOVEMENT_SPEED * 5;
+    private static final float NOCLIP_SPEED = MOVEMENT_SPEED * 10;
     private static final float GRAVITY = 0.025f;
     private static final float TERMINAL_VELOCITY = MOVEMENT_SPEED * 5;
     private static final float JUMP_SPEED = 0.40f;
@@ -194,7 +194,7 @@ public class Game {
         }
 
         if (gridPositionUpdated || chunkPositionUpdated) {
-//            System.out.println("pos (" + worldX + "," + worldZ + ") chunk (" + chunkI + "," + chunkJ + ")");
+            System.out.println("pos (" + worldX + "," + worldZ + ") chunk (" + chunkI + "," + chunkJ + ")");
         }
 
         if (chunkPositionUpdated && DYNAMIC_WORLD_GENERATION) {

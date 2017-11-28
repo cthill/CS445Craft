@@ -20,14 +20,12 @@ public class World {
     private final Map<Integer, Map<Integer, Chunk>> chunks;
     private final Map<Chunk, Integer> chunkToIndexI;
     private final Map<Chunk, Integer> chunkToIndexJ;
-    private final List<LightSource> lightSources;
     
     public World() {
         chunksList = new ArrayList<>();
         chunks = new HashMap<>();        
         chunkToIndexI = new HashMap<>();
         chunkToIndexJ = new HashMap<>();
-        lightSources = new ArrayList<>();
     }
     
     public void addChunk(Chunk chunk) {

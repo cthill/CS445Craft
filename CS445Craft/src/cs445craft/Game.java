@@ -67,12 +67,12 @@ public class Game {
         scheduledForRebuild = new HashSet<>();
         
         // setup the chunk generation thread
-        ungeneratedChunkQueue = new LinkedBlockingQueue<Chunk>();
+        ungeneratedChunkQueue = new LinkedBlockingQueue<>();
         chunkGenerator = new ChunkGenerator(ungeneratedChunkQueue);
         
         // setup mesh building thread
-        unbuiltChunkQueue = new LinkedBlockingQueue<Chunk>();
-        builtChunkQueue = new LinkedBlockingQueue<Chunk>();
+        unbuiltChunkQueue = new LinkedBlockingQueue<>();
+        builtChunkQueue = new LinkedBlockingQueue<>();
         meshBuilder = new MeshBuilder(unbuiltChunkQueue, builtChunkQueue);
                 
         init();

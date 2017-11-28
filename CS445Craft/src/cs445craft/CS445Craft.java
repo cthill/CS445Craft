@@ -4,7 +4,7 @@
 * class: CS 445 – Computer Graphics
 *
 * assignment: Final Project
-* date last modified: 10/16/2017
+* date last modified: 10/28/2017
 *
 * purpose: This is the main class in the program. It instantiates
 * the Game object and catches exceptions.

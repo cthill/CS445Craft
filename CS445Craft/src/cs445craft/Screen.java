@@ -4,7 +4,7 @@
 * class: CS 445 – Computer Graphics
 *
 * assignment: Final Project
-* date last modified: 10/16/2017
+* date last modified: 10/28/2017
 *
 * purpose: This class is responsible for managing the OpenGL window
 * and maintains a list of 'Drawable' objects that need to be
@@ -14,7 +14,6 @@
 ****************************************************************/
 package cs445craft;
 
-import java.awt.Font;
 import java.nio.FloatBuffer;
 import java.util.ArrayList;
 import java.util.Collection;
@@ -27,25 +26,20 @@ import org.lwjgl.opengl.Display;
 import org.lwjgl.opengl.DisplayMode;
 import static org.lwjgl.opengl.GL11.*;
 import org.lwjgl.util.glu.GLU;
-import org.newdawn.slick.TrueTypeFont;
 
 public class Screen {
-    private static float DRAW_DIST = Chunk.CHUNK_S * Voxel.BLOCK_SIZE * 7.5f;
+    private static float DRAW_DIST = Chunk.CHUNK_S * Voxel.BLOCK_SIZE * 6.5f;
     private final int width, height;
     private float r, g, b;
-    private final String title;
     private final Camera camera;
     private final List<Drawable> objects;
-    private Font awtFont;
-    private TrueTypeFont font;
     
-//    private FloatBuffer lightPosition;
-//    private FloatBuffer lightColor;
+    private FloatBuffer lightPosition;
+    private FloatBuffer lightColor;
     
     public Screen(int width, int height, String title, Camera camera) throws LWJGLException {
         this.width = width;
         this.height = height;
-        this.title = title;
         this.camera = camera;
         objects = new ArrayList<>();
         r = 1.0f;
@@ -58,28 +52,30 @@ public class Screen {
         Display.setTitle(title);
         Display.create();
         
+        // setup some opengl config
         glClearColor(0.5f, 0.85f, 1.0f, 1.0f);
         glEnable(GL_TEXTURE_2D);
         glAlphaFunc(GL_GREATER, 0.5f);
         glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
         glFrontFace(GL_CW);
         
-//        lightPosition = BufferUtils.createFloatBuffer(4);
-//        lightPosition.put(0).put((Chunk.CHUNK_H + 5) * Voxel.BLOCK_SIZE).put(0).put(1.0f).flip();
-//        lightColor = BufferUtils.createFloatBuffer(4);
-//        lightColor.put(1.0f).put(1.0f).put(1.0f).put(1.0f).flip();        
-
-//        awtFont = new Font("Times New Roman", Font.PLAIN, 24);
-//        font = new TrueTypeFont(awtFont, false);
+        lightPosition = BufferUtils.createFloatBuffer(4);
+        lightPosition.put(0).put((Chunk.CHUNK_H + 5) * Voxel.BLOCK_SIZE).put(0).put(1.0f).flip();
+        lightColor = BufferUtils.createFloatBuffer(4);
+        lightColor.put(1.0f).put(1.0f).put(1.0f).put(1.0f).flip();        
     }
     
+    /**
+    * method: moveLight()
+    * purpose: move the world light to a new x,y,z position
+    **/
     public void moveLight(float x, float y, float z) {
-//        lightPosition = BufferUtils.createFloatBuffer(4);
-//        lightPosition.put(x).put(y).put(z).put(1.0f).flip();
+        lightPosition = BufferUtils.createFloatBuffer(4);
+        lightPosition.put(x).put(y).put(z).put(1.0f).flip();
     }
 
     /**
-    * method: addObject
+    * method: addObject()
     * purpose: add an object that satisfies the Drawable interface. Object will
     * be drawn to the screen on each frame.
     **/
@@ -89,37 +85,74 @@ public class Screen {
         }
     }
     
+    /**
+    * method: addObject()
+    * purpose: add a collection of objects that satisfy the Drawable interface.
+    * Objects will be drawn to the screen on each frame.
+    **/
     public void addObjects(Collection< ? extends Drawable> coll) {
         Collection< ? extends Drawable> filtered = coll.stream().filter(object -> !objects.contains(object)).collect(Collectors.toList());
         objects.addAll(filtered);
     }
     
+    /**
+    * method: setTintColor()
+    * purpose: Set the screen tint color. Normally the color is pure white. Sometimes,
+    * it may be desirable to tint the screen a color (like blue when the player is
+    * underwater).
+    **/
     public void setTintColor(float r, float g, float b) {
         this.r = r;
         this.g = g;
         this.b = b;
     }
     
+    /**
+    * method: incDrawDist()
+    * purpose: Add a value to the DRAW_DIST
+    **/
     public void incDrawDist(float d) {
         DRAW_DIST += d;
     }
     
     /**
-    * method: drawFrame
+    * method: drawFrame()
     * purpose: Draw one frame by looping through the list of Drawable objects
     * and rendering each one.
     **/
     public void drawFrame() {
+        // render 3D objects
         render3D();
+        // render 2d hud objects
         render2D();
+        
+        // update display and sync to 60 hz.
+        Display.update();
+        Display.sync(60);
     }
     
+    /**
+    * method: render3D()
+    * purpose: Render 3D objects to the display. Rendering is a 4 step process.
+    * 
+    * Step 1: setup OpenGL config, look through camera, etc.
+    * 
+    * Step 2: Sort all opaque 3D objects within the draw distance. Sort order is
+    *  front to back, based on distance from the camera's x,y,z. After the sort,
+    *  render the objects to the screen.
+    * 
+    * Step 3: Sort all translucent 3D objects within the draw distance. Sort order
+    * is back to front, based on distance from the camera's x,y,z. After the sort,
+    * render the objects to the screen. Translucent objects must be rendered in
+    * after the opaque objects, and must be rendered back to front. Otherwise there
+    * will be alpha blending artifacts
+    **/
     private void render3D() {
         // setup 3d config
-        glEnable(GL_DEPTH_TEST);
-        glEnable(GL_CULL_FACE);
-        glDisable(GL_BLEND);
-        glMatrixMode(GL_PROJECTION);
+        glEnable(GL_DEPTH_TEST); // enable z-buffering
+        glEnable(GL_CULL_FACE); // don't draw occluded faces
+        glDisable(GL_BLEND); // turn off alpha blending
+        glMatrixMode(GL_PROJECTION); // setup projection matrix
         glLoadIdentity();
         GLU.gluPerspective(100.0f, (float) width / (float) height, 0.05f, DRAW_DIST);
         glMatrixMode(GL_MODELVIEW);
@@ -132,14 +165,16 @@ public class Screen {
         glPushMatrix();
         camera.lookThrough();
         
-//        glEnable(GL_LIGHTING);//enables our lighting
-//        glLight(GL_LIGHT0, GL_POSITION, lightPosition);
-//        glLight(GL_LIGHT0, GL_SPECULAR, lightColor);
-//        glLight(GL_LIGHT0, GL_DIFFUSE, lightColor);
-//        glLight(GL_LIGHT0, GL_AMBIENT, lightColor);
-//        glEnable(GL_LIGHT0);
+        // enables our lighting
+        glEnable(GL_LIGHTING);
+        glLight(GL_LIGHT0, GL_POSITION, lightPosition);
+        glLight(GL_LIGHT0, GL_SPECULAR, lightColor);
+        glLight(GL_LIGHT0, GL_DIFFUSE, lightColor);
+        glLight(GL_LIGHT0, GL_AMBIENT, lightColor);
+        glEnable(GL_LIGHT0);
 
         // 3d draw solid objects
+        // enable alpha test so we can cut out transparent parts of textures (like leaves or flowers)
         glEnable(GL_ALPHA_TEST);
         // sort opaque objects front to back
         objects.sort(Comparator.comparing(object -> ((Drawable) object).distanceTo(camera.x, camera.y, camera.z)).reversed());
@@ -169,20 +204,22 @@ public class Screen {
         // 3d draw finish
         glPopMatrix();
         glColor3f(1.0f,1.0f,1.0f);
-//        glDisable(GL_LIGHTING);
+        glDisable(GL_LIGHTING);
+        glDisable(GL_DEPTH_TEST);
+        glEnable(GL_BLEND);
     }
     
-    private void render2D() {
-
-        
+    /**
+    * method: render2D()
+    * purpose: Render 2d objects to the display. Currently, this method just uses
+    * GL_POINTS to draw crosshairs.
+    **/
+    private void render2D() {        
         // switch to 2d mode for hud draw
         glMatrixMode(GL_PROJECTION);
         glLoadIdentity();
         glOrtho(-width/2, width/2, -height/2, height/2, 1, -1);
         glMatrixMode(GL_MODELVIEW);
-        glDisable(GL_DEPTH_TEST);
-        glDisable(GL_CULL_FACE);
-        glEnable(GL_BLEND);
         glClear(GL_DEPTH_BUFFER_BIT);
         
         // draw crosshairs
@@ -203,18 +240,10 @@ public class Screen {
             glVertex2f(0,-4);
         glEnd();
         glPopMatrix();
-        
-        
-//        font = new TrueTypeFont(awtFont, false);
-//        font.drawString(0,0, "TESTING", Color.yellow);
-        
-        // update display and sync to 60 hz.
-        Display.update();
-        Display.sync(60);
     }
     
     /**
-    * method: getCloseRequested
+    * method: getCloseRequested()
     * purpose: Returns true if the user requested to close the window.
     **/
     public boolean getCloseRequested() {
@@ -227,7 +256,7 @@ public class Screen {
     }
     
     /**
-    * method: close
+    * method: close()
     * purpose: close the window
     **/
     public void close() {

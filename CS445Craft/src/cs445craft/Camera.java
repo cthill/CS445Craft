@@ -4,10 +4,11 @@
 * class: CS 445 – Computer Graphics
 *
 * assignment: Final Project
-* date last modified: 10/08/2017
+* date last modified: 10/28/2017
 *
 * purpose: This class holds the camera state: position, pitch angle,
-* and yaw angle.
+* and yaw angle. It also provides a lookThrough() method to apply
+* transformations to the current matrix.
 * 
 ****************************************************************/
 package cs445craft;
@@ -24,12 +25,12 @@ public class Camera {
         this.x = x;
         this.y = y;
         this.z = z;
-        this.yaw = 180.0f;
+        this.yaw = 0.0f;
         this.pitch = 45.0f;
     }
     
     /**
-    * method: incYaw
+    * method: incYaw()
     * purpose: add a float value to the yaw angle of the camera (in degrees).
     * Positive values yaw right, negative values yaw left.
     **/
@@ -38,7 +39,7 @@ public class Camera {
     }
     
     /**
-    * method: incPitch
+    * method: incPitch()
     * purpose: add a float value to the pitch angle of the camera (in degrees).
     * Positive values pitch up, negative values pitch down.
     **/
@@ -52,7 +53,7 @@ public class Camera {
     }
     
     /**
-    * method: lookThrough
+    * method: lookThrough()
     * purpose: uses glRotatef and glTranslatef to "look through" the camera. Call
     * on each frame.
     **/

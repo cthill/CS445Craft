@@ -1,8 +1,16 @@
-/*
- * To change this license header, choose License Headers in Project Properties.
- * To change this template file, choose Tools | Templates
- * and open the template in the editor.
- */
+/***************************************************************
+* file: WorldGenerator.java
+* author: CS445 Group 42^3
+* class: CS 445 – Computer Graphics
+*
+* assignment: Final Project
+* date last modified: 10/28/2017
+*
+* purpose: This class is responsible for generating new chunks
+* using SimplexNoise and java.util.Random. It supports four biomes,
+* various plants, ores, water, and caverns.
+* 
+****************************************************************/
 package cs445craft;
 
 import cs445craft.Voxel.VoxelType;
@@ -16,10 +24,6 @@ import java.util.Random;
 import java.lang.management.ThreadMXBean;
 import java.lang.management.ManagementFactory;
 
-/**
- *
- * @author cthill
- */
 public class WorldGenerator {
     // generator constants
     private static final int WORLD_HEADROOM = 10; // headroom for player building on top of world
@@ -37,9 +41,11 @@ public class WorldGenerator {
     private static final int ORE_VEIN_MIN = 1;
     private static final int ORE_VEIN_MAX = 8;
     
-    private static final int NOISE_FACTOR_HEIGHT = 10;
-    private static final int NOISE_FACTOR_LOCAL_HEIGHT = 2;
-    private static final int NOISE_FACTOR_REGION_HEIGHT = 14;
+    private static final int NOISE_OFFSET_X = 0;
+    private static final int NOISE_OFFSET_Z = 0;
+    private static final int NOISE_FACTOR_HEIGHT = 8;
+    private static final int NOISE_FACTOR_LOCAL_HEIGHT = 5;
+    private static final int NOISE_FACTOR_REGION_HEIGHT = 7;
 
     private final int initialSize;
     private final Random rand;
@@ -69,6 +75,11 @@ public class WorldGenerator {
         noiseGenCavern = new SimplexNoise(30, .1, seed + 4);
     }
     
+    /**
+    * method: getOrGenerate()
+    * purpose: Get or create a new world object. When creating a world, intialize
+    * it with new chunks.
+    **/
     public World getOrGenerate() {
         if (world != null) {
             return world;
@@ -78,7 +89,7 @@ public class WorldGenerator {
         
         for (int i = 0; i < initialSize; i++) {
             for (int j = 0; j < initialSize; j++) {
-                Chunk c = createChunk(i, j);
+                Chunk c = new Chunk(world, i, j);
                 fillChunkGenerateRandom(c);
                 world.addChunk(c);
             }
@@ -86,48 +97,105 @@ public class WorldGenerator {
         
         // rebuild all the meshes
         world.getChunks().forEach(chunk -> {
-            chunk.init();
+            chunk.setGenerated();
             chunk.rebuildMesh();
-            chunk.setInitialized();
-            chunk.setDirty(false);
+            chunk.copyMeshToVBO();
         });
         
         return world;
     }
     
-    private Chunk createChunk(int i, int j) {
-        return new Chunk(world, i, j);
+    /**
+    * method: createNewChunksIfNeeded()
+    * purpose: Scan the voxel grid around a given i and j chunk location to determine
+    * if new chunks need to be created. Used for on the fly chunk generation when
+    * the player moves towards ungenerated parts of the world.
+    **/
+    public List<Chunk> createNewChunksIfNeeded(int i, int j, int distance, Screen screen) {
+        List<Chunk> newChunks = new ArrayList<>();
+        for (int d = 1; d <= distance; d++) {
+            for (int di = -d; di <= d; di++) {
+                createChunk(i + di, j + d, newChunks, screen);
+                createChunk(i + di, j - d, newChunks, screen);
+            }
+            for (int dj = -d; dj <= d; dj++) {
+                createChunk(i + d, j + dj, newChunks, screen);
+                createChunk(i - d, j + dj, newChunks, screen);
+            }
+        }
+        
+        return newChunks;
     }
     
-    private double getNoise2d(SimplexNoise noiseGen, int x, int y) {
-        return noiseGen.getNoise(x, y);
+    /**
+    * method: createChunk()
+    * purpose: Create an empty chunk at a give i and j index and add it to the
+    * screen and the world.
+    **/
+    private void createChunk(int i, int j, List<Chunk> newChunks, Screen screen) {
+        if (world.getChunk(i, j) == null) {
+            Chunk c = new Chunk(world, i, j);
+            newChunks.add(c);
+            world.addChunk(c);
+            screen.addObject(c);
+        }
     }
     
+    /**
+    * method: getNoise2d()
+    * purpose: get 2d simplex noise using a given noise generator. shift the x
+    * and z values by NOISE_OFFSET_X and NOISE_OFFSET_Z respectively.
+    **/
+    private double getNoise2d(SimplexNoise noiseGen, int x, int z) {
+        return noiseGen.getNoise(x + NOISE_OFFSET_X, z + NOISE_OFFSET_Z);
+    }
+    
+    /**
+    * method: getNoise3d()
+    * purpose: get 3d simplex noise using a given noise generator. shift the x
+    * and z values by NOISE_OFFSET_X and NOISE_OFFSET_Z respectively.
+    **/
     private double getNoise3d(SimplexNoise noiseGen, int x, int y, int z) {
-        return noiseGen.getNoise(x, y, z );
+        return noiseGen.getNoise(x + NOISE_OFFSET_X, y, z + NOISE_OFFSET_Z);
     }
     
-    private void fillChunkGenerateRandom(Chunk chunk) {
+    /**
+    * method: fillChunkGenerateRandom()
+    * purpose: fill a given chunk with randomly generated voxel data. Since all
+    * chunks generated by the same world generator use the same SimplexNoise objects,
+    * the generated world will be contiguous between them.
+    **/
+    public void fillChunkGenerateRandom(Chunk chunk) {
+        // create thread timer
         ThreadMXBean threadTimer = ManagementFactory.getThreadMXBean();
         long start = threadTimer.getCurrentThreadCpuTime();
         
-        VoxelType[][][] blocks = new VoxelType[CHUNK_S][CHUNK_H][CHUNK_S];
+        /*
+        The ordering of the blocks array is [y][x][z]. The reason for doing this
+        is because the WorldGenerator was easier to design if we iterate first on
+        the y-axis and then on the x and z axiis. If we iterate in the same way
+        the array is structured, we get better cache locality and hopefully better
+        performance.
+        */
+        VoxelType[][][] blocks = new VoxelType[CHUNK_H][CHUNK_S][CHUNK_S];
         
-        // generate heights for each xz position
+        // generate heights and biome for each xz position
         int[][] cellHeights = new int[CHUNK_S][CHUNK_S];
         Biome[][] biomes = new Biome[CHUNK_S][CHUNK_S];
-
         for (int x = 0; x < CHUNK_S; x++) {
             for (int z = 0; z < CHUNK_S; z++) {
+                // computer x and z coords for the noise generator
                 int noiseX = x + chunk.indexI * CHUNK_S;
                 int noiseZ = z + chunk.indexJ * CHUNK_S;
                 
+                // compute local and region height factors
                 double localHeightNoise = getNoise2d(noiseGenLocalHeight, noiseX, noiseZ) * NOISE_FACTOR_LOCAL_HEIGHT;
                 double regionHeightNoise = 1 + getNoise2d(noiseGenRegionHeight, chunk.indexI, chunk.indexJ) * NOISE_FACTOR_REGION_HEIGHT;
                 
+                // multiply height factors
                 double combinedHeightNoise = Math.abs(NOISE_FACTOR_HEIGHT * localHeightNoise * regionHeightNoise);
-//                System.out.println(localHeightNoise + " " + regionHeightNoise + " " + combinedHeightNoise);                
                 
+                // computer the height delta for this cell
                 int heightDelta = (int) combinedHeightNoise;
                 if (heightDelta > UPPER_LAYER_MAX_HEIGHT_DELTA) {
                     heightDelta = UPPER_LAYER_MAX_HEIGHT_DELTA;
@@ -135,16 +203,18 @@ public class WorldGenerator {
                 if (heightDelta < 1) {
                     heightDelta = 1;
                 }
-                        
+                
+                // compute the height of this cell
                 int cellHeight = BEDROCK_HEIGHT + ROCK_LAYER_HEIGHT + heightDelta;
                 if (cellHeight > CHUNK_H - 1 - WORLD_HEADROOM) {
                     cellHeight = CHUNK_H - 1 - WORLD_HEADROOM;
                 }
-                
                 cellHeights[x][z] = cellHeight;
                 
+                
+                // choose biome
                 double biomeNoise = Math.abs(getNoise2d(noiseGenBiome, noiseX, noiseZ)) * 3;
-                if (Math.abs(localHeightNoise) < 2 && Math.abs(regionHeightNoise) < 2 && Math.abs(combinedHeightNoise) < 2) {
+                if (Math.abs(localHeightNoise) < 1 && Math.abs(regionHeightNoise) < 1 && Math.abs(combinedHeightNoise) < 1) {
                     // very low region, generate desert or ocean
                     if (biomeNoise > 0.10) {
                         cellHeights[x][z] = BEDROCK_HEIGHT + ROCK_LAYER_HEIGHT + 1;
@@ -168,28 +238,42 @@ public class WorldGenerator {
             }
         }
         
-        //for (int y = ROCK_LAYER_HEIGHT; y < CHUNK_H - WORLD_HEADROOM; y++) {
+        // loop over each vertical layer in this chunk
         for (int y = 0; y < CHUNK_H - WORLD_HEADROOM; y++) {
             if (y < BEDROCK_HEIGHT) {
+                // lowest layer is bedrock
                 generateFlatLayer(blocks, y, VoxelType.BEDROCK);
             } else if (y < BEDROCK_HEIGHT + ROCK_LAYER_HEIGHT) {
+                // middle layers are rocky
                 generateRockLayer(chunk, blocks, y);
             } else {
+                // upper layers
                 generateUpperLayer(chunk, blocks, y, cellHeights, biomes);
             }
+            // yeild incase other threads need to do something important
+            Thread.yield();
         }
         
+        // once all the layers are generated, copy the data and mark the chunk as generated
         chunk.copyBlocks(blocks, 0, CHUNK_S, 0, CHUNK_H, 0, CHUNK_S);
         chunk.setGenerated();
         System.out.println("Generated " + chunk.indexI + "," + chunk.indexJ + " in " + (threadTimer.getCurrentThreadCpuTime() - start) / 1000000000.0);
     }
     
+    /**
+    * method: generateFlatLayer()
+    * purpose: generate a flat layer filled with a single VoxelType.
+    **/
     private void generateFlatLayer(VoxelType[][][] blocks, int y, VoxelType type) {
         for (int x = 0; x < CHUNK_S; x++) {
-            Arrays.fill(blocks[x][y], type);
+            Arrays.fill(blocks[y][x], type);
         }
     }
     
+    /**
+    * method: generateRockLayer()
+    * purpose: generate a rocky underground layer
+    **/
     private void generateRockLayer(Chunk chunk, VoxelType[][][] blocks, int y) {
         for (int x = 0; x < CHUNK_S; x++) {
             for (int z = 0; z < CHUNK_S; z++) {
@@ -198,6 +282,12 @@ public class WorldGenerator {
         }
     }
     
+    /**
+    * method: generateRockLayerSingle()
+    * purpose: generate a single cell of rocky underground. Use simple noise to
+    * determine if this cell should be open space. Use Random() to generate ore
+    * veins.
+    **/
     private void generateRockLayerSingle(Chunk chunk, VoxelType[][][] blocks, int x, int y, int z) {
         int noiseX = x + chunk.indexI * CHUNK_S;
         int noiseZ = z + chunk.indexJ * CHUNK_S;
@@ -205,7 +295,7 @@ public class WorldGenerator {
         boolean openSpace = (noise < 0.475);
 
         if (!openSpace) {
-            blocks[x][y][z] = VoxelType.STONE;
+            blocks[y][x][z] = VoxelType.STONE;
             
             if (y < DIAMOND_MAX_HEIGHT && rand.nextDouble() < DIAMOND_RATE)
                 generateOreVein(blocks, x, y, z, VoxelType.DIAMOND);
@@ -218,6 +308,11 @@ public class WorldGenerator {
         }
     }
     
+    /**
+    * method: generateUpperLayer()
+    * purpose: generate an upper layer. Use the boiomes array to choose which
+    * helper method to call.
+    **/
     private void generateUpperLayer(Chunk chunk, VoxelType[][][] blocks, int y, int[][] cellHeights, Biome[][] biomes) {
         for (int x = 0; x < CHUNK_S; x++) {
             for (int z = 0; z < CHUNK_S; z++) {
@@ -253,6 +348,10 @@ public class WorldGenerator {
         }
     }
     
+    /**
+    * method: generateCellNormalBiome()
+    * purpose: generate a single cell of the normal biome
+    **/
     private void generateCellNormalBiome(Chunk chunk, VoxelType[][][] blocks, int x, int y, int z, int cellHeight, int rockyCutoff) {
         boolean openSpace = false;
         int noiseX = x + chunk.indexI * CHUNK_S;
@@ -267,14 +366,18 @@ public class WorldGenerator {
         if (!openSpace) {
             if (y == cellHeight) {
                 // top layer
-                blocks[x][y][z] = VoxelType.GRASS;
+                blocks[y][x][z] = VoxelType.GRASS;
                 geterateGrassFoliage(blocks, x, y, z);
             } else {
-                blocks[x][y][z] = VoxelType.DIRT;
+                blocks[y][x][z] = VoxelType.DIRT;
             }
         }
     }
     
+    /**
+    * method: generateCellWinterBiome()
+    * purpose: generate a single cell of the winter biome
+    **/
     private void generateCellWinterBiome(Chunk chunk, VoxelType[][][] blocks, int x, int y, int z, int cellHeight, int rockyCutoff) {
         boolean openSpace = false;
         int noiseX = x + chunk.indexI * CHUNK_S;
@@ -293,52 +396,64 @@ public class WorldGenerator {
                     // low top layer
                     float v = (float) (getNoise3d(noiseGenBlockType, noiseX, y, noiseZ) + 1);
                     if (v > 1.05) {
-                        blocks[x][y][z] = VoxelType.SAND;
-                        blocks[x][y+1][z] = VoxelType.SNOW;
+                        blocks[y][x][z] = VoxelType.SAND;
+                        blocks[y+1][x][z] = VoxelType.SNOW;
                     } else if (v > .985) {
-                        blocks[x][y][z] = VoxelType.ICE;
+                        blocks[y][x][z] = VoxelType.ICE;
                     } else {
-                        blocks[x][y][z] = VoxelType.ICE_GRASS;
-                        blocks[x][y+1][z] = VoxelType.SNOW;
+                        blocks[y][x][z] = VoxelType.ICE_GRASS;
+                        blocks[y+1][x][z] = VoxelType.SNOW;
                         generateWinterFoliage(blocks, x, y, z);
                     }
                 } else {
                     // high top layer
-                    blocks[x][y][z] = VoxelType.ICE_GRASS;
-                    blocks[x][y+1][z] = VoxelType.SNOW;
+                    blocks[y][x][z] = VoxelType.ICE_GRASS;
+                    blocks[y+1][x][z] = VoxelType.SNOW;
                     generateWinterFoliage(blocks, x, y, z);
                 }
             } else {
-                blocks[x][y][z] = VoxelType.DIRT;
+                blocks[y][x][z] = VoxelType.DIRT;
             }
         }
     }
     
+    /**
+    * method: generateCellOceanBiome()
+    * purpose: generate a single cell of the ocean biome
+    **/
     private void generateCellOceanBiome(Chunk chunk, VoxelType[][][] blocks, int x, int y, int z, int cellHeight, int rockyCutoff) {
         int noiseX = x + chunk.indexI * CHUNK_S;
         int noiseZ = z + chunk.indexJ * CHUNK_S;
         double v = getNoise2d(noiseGenBlockType, noiseX, noiseZ);
         if (v > 0.45) {
-            blocks[x][y][z] = VoxelType.SAND;
+            blocks[y][x][z] = VoxelType.SAND;
             if (y == cellHeight) {
                 generateWetSandFoliage(blocks, x, y, z); 
             }
         } else {
             if (y == cellHeight) {
-                blocks[x][y][z] = VoxelType.WATER;
+                blocks[y][x][z] = VoxelType.WATER;
             } else {
-                blocks[x][y][z] = VoxelType.DIRT;
+                blocks[y][x][z] = VoxelType.DIRT;
             }
         }
     }
     
+    /**
+    * method: generateCellDesertBiome()
+    * purpose: generate a single cell of the desert biome
+    **/
     private void generateCellDesertBiome(Chunk chunk, VoxelType[][][] blocks, int x, int y, int z, int cellHeight, int rockyCutoff) {
-        blocks[x][y][z] = VoxelType.SAND;
+        blocks[y][x][z] = VoxelType.SAND;
         if (y == cellHeight) {
             generateDesertFoliage(blocks, x, y, z);
         }
     }
     
+    /**
+    * method: generateOreVein()
+    * purpose: generate an ore vein at a given x,y,z location.
+    **/
     private void generateOreVein(VoxelType[][][] blocks, int x, int y, int z, VoxelType v) {
         int length = rand.nextInt(ORE_VEIN_MAX - ORE_VEIN_MIN + 1) + ORE_VEIN_MIN;
         int[] coords = new int[length * 3];
@@ -373,23 +488,31 @@ public class WorldGenerator {
         addBlocksSafe(blocks, coords, v);
     }
     
+    /**
+    * method: geterateGrassFoliage()
+    * purpose: use Random() to sometimes add foliage to a given x, y, z position
+    **/
     private void geterateGrassFoliage(VoxelType[][][] blocks, int x, int y, int z) {
         if (rand.nextDouble() < 0.05) 
-            blocks[x][y+1][z] = VoxelType.TALL_GRASS;
+            blocks[y+1][x][z] = VoxelType.TALL_GRASS;
         if (rand.nextDouble() < 0.0040)
-            blocks[x][y+1][z] = VoxelType.RED_FLOWER;
+            blocks[y+1][x][z] = VoxelType.RED_FLOWER;
         if (rand.nextDouble() < 0.0040)
-            blocks[x][y+1][z] = VoxelType.YELLOW_FLOWER;
+            blocks[y+1][x][z] = VoxelType.YELLOW_FLOWER;
         if (rand.nextDouble() < 0.001)
-            blocks[x][y+1][z] = VoxelType.PUMPKIN;
+            blocks[y+1][x][z] = VoxelType.PUMPKIN;
         if (rand.nextDouble() < 0.001)
-            blocks[x][y+1][z] = VoxelType.RED_MUSHROOM;
+            blocks[y+1][x][z] = VoxelType.RED_MUSHROOM;
         if (rand.nextDouble() < 0.001)
-            blocks[x][y+1][z] = VoxelType.MUSHROOM;
+            blocks[y+1][x][z] = VoxelType.MUSHROOM;
         if (rand.nextDouble() < 0.0015)
             generateTree(blocks, x, y + 1, z, false);
     }
     
+    /**
+    * method: generateWetSandFoliage()
+    * purpose: use Random() to sometimes add reeds to a given x, y, z position
+    **/
     private void generateWetSandFoliage(VoxelType[][][] blocks, int x, int y, int z) {
         if (rand.nextDouble() < 0.005) {
             // generate reeds
@@ -397,17 +520,25 @@ public class WorldGenerator {
             int min = 2;
             int height = rand.nextInt(max - min + 1) + min;
             for (int i = 1; i <= height; i++) {
-                blocks[x][y+i][z] = VoxelType.REED;
+                blocks[y+i][x][z] = VoxelType.REED;
             }
         }
     }
     
+    /**
+    * method: generateWetSandFoliage()
+    * purpose: use Random() to add snow and sometimes trees to a given x, y, z position
+    **/
     private void generateWinterFoliage(VoxelType[][][] blocks, int x, int y, int z) {
-        blocks[x][y+1][z] = VoxelType.SNOW;
+        blocks[y+1][x][z] = VoxelType.SNOW;
         if (rand.nextDouble() < 0.0015)
             generateTree(blocks, x, y + 1, z, true);
     }
     
+    /**
+    * method: generateDesertFoliage()
+    * purpose: use Random() to add cacti to a given x, y, z position
+    **/
     private void generateDesertFoliage(VoxelType[][][] blocks, int x, int y, int z) {
         if (rand.nextDouble() < 0.001) {
             // generate caci
@@ -415,19 +546,27 @@ public class WorldGenerator {
             int min = 3;
             int height = rand.nextInt(max - min + 1) + min;
             for (int i = 1; i <= height; i++) {
-                blocks[x][y+i][z] = VoxelType.CACTUS;
+                blocks[y+i][x][z] = VoxelType.CACTUS;
             }
         }
     }
     
     /**
-    * method: addTree()
+    * method: generateTree()
     * purpose: Add a simple tree to the blocks array at a given x,y,z. Uses the
     * addBlocks method (which includes bounds checking) to place the blocks.
     **/
     private void generateTree(VoxelType[][][] blocks, int x, int y, int z, boolean snowy) {
-        if (x == 0 || x == CHUNK_S || z == 0 || z == CHUNK_S) {
-            return;
+        if (x == 0) {
+            x++;
+        } else if (x == CHUNK_S - 1) {
+            x--;
+        }
+        
+        if (z == 0) {
+            z++;
+        } else if (z == CHUNK_S - 1) {
+            z--;
         }
         
         int[] trunkCoords = new int[] {
@@ -487,7 +626,7 @@ public class WorldGenerator {
     }
     
     /**
-    * method: addBlocks()
+    * method: addBlocksSafe()
     * purpose: Add blocks of a given type to all the x,y,z positions in the
     * input float array. (x,y,z refer to indices of the blocks array)
     **/
@@ -497,51 +636,14 @@ public class WorldGenerator {
             int yy = blockCoords[i + 1];
             int zz = blockCoords[i + 2];
             if (
-                xx >= 0 && xx < blocks.length &&
-                yy >= 0 && yy < blocks[xx].length &&
-                zz >= 0 && zz < blocks[xx][yy].length
+                yy >= 0 && yy < blocks.length &&
+                xx >= 0 && xx < blocks[yy].length &&
+                zz >= 0 && zz < blocks[yy][xx].length
             ) {
-                if (blocks[xx][yy][zz] != VoxelType.BEDROCK) {
-                    blocks[xx][yy][zz] = type;
+                if (blocks[yy][xx][zz] != VoxelType.BEDROCK) {
+                    blocks[yy][xx][zz] = type;
                 }
             }
-        }
-    }
-    
-    public List<Runnable> generateNewChunksIfNeeded(int i, int j, int distance, Screen screen) {
-        List<Runnable> newTasks = new ArrayList<>();
-        List<Chunk> newChunks = new ArrayList<>();
-        for (int d = 1; d <= distance; d++) {
-            for (int di = -d; di <= d; di++) {
-                addChunkGenerationTask(i + di, j + d, newTasks, newChunks, screen);
-                addChunkGenerationTask(i + di, j - d, newTasks, newChunks, screen);
-            }
-            for (int dj = -d; dj <= d; dj++) {
-                addChunkGenerationTask(i + d, j + dj, newTasks, newChunks, screen);
-                addChunkGenerationTask(i - d, j + dj, newTasks, newChunks, screen);
-            }
-            
-            newChunks.forEach(chunk -> {
-                // make sure adjacent chunks are rebuilt
-                world.findAllAdjacentChunks(chunk).forEach(adjChunk -> {
-                    adjChunk.setDirty(true);
-                });
-            });
-        }
-        return newTasks;
-    }
-    
-    private void addChunkGenerationTask(int i, int j, List<Runnable> newTasks, List<Chunk> newChunks, Screen screen) {
-        if (world.getChunk(i, j) == null) {
-            Chunk c = createChunk(i, j);
-            newChunks.add(c);
-            world.addChunk(c);
-            screen.addObject(c);
-            
-            // generate the chunk later
-            newTasks.add((Runnable) () -> {
-                fillChunkGenerateRandom(c);
-            });
         }
     }
 }

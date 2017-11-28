@@ -4,7 +4,7 @@
 * class: CS 445 – Computer Graphics
 *
 * assignment: Final Project
-* date last modified: 10/27/2017
+* date last modified: 10/28/2017
 *
 * purpose: This abstract class defines the interface for any
 * object that will be drawn to the screen

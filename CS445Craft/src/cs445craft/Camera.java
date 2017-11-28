@@ -4,7 +4,7 @@
 * class: CS 445 – Computer Graphics
 *
 * assignment: Final Project
-* date last modified: 10/27/2017
+* date last modified: 10/28/2017
 *
 * purpose: This class holds the camera state: position, pitch angle,
 * and yaw angle. It also provides a lookThrough() method to apply

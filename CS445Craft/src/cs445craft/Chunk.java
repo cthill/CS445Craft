@@ -4,7 +4,7 @@
 * class: CS 445 – Computer Graphics
 *
 * assignment: Final Project
-* date last modified: 10/27/2017
+* date last modified: 10/28/2017
 *
 * purpose: This class defines one 30x30x90 chunk of voxels. The class uses a 3d
 * array of the enum VoxelType to keep track of which blocks are in each cell.
@@ -385,17 +385,22 @@ public class Chunk extends Drawable {
                     // check if texture is translucent (like water or glass)
                     boolean translucentTexture = Voxel.isTranslucent(voxelType);
                     
+                    // translate x,y,z indices to OpenGL coordinates
+                    float glX = (float) (x * Voxel.BLOCK_SIZE);
+                    float glY = (float) (y * Voxel.BLOCK_SIZE);
+                    float glZ = (float) (z * Voxel.BLOCK_SIZE);
+                    
                     // loop over the faces and write them to the buffers
                     for (int face = 0; face < 6; face++) {
                         if (faceVisible[face]) {
                             if (translucentTexture) {
                                 // write to the translucent buffer
-                                Voxel.writeFaceVertices(tempMeshDataTranslucent, writeIndexTranslucent, face, voxelType, x, y, z);
+                                Voxel.writeFaceVertices(tempMeshDataTranslucent, writeIndexTranslucent, face, voxelType, glX, glY, glZ);
                                 writeIndexTranslucent += floatsPerFace;
                                 tempNumFacesTranslucent++;
                             } else {
                                 // write to the opaque buffer
-                                Voxel.writeFaceVertices(tempMeshData, writeIndex, face, voxelType, x, y, z);
+                                Voxel.writeFaceVertices(tempMeshData, writeIndex, face, voxelType, glX, glY, glZ);
                                 writeIndex += floatsPerFace;
                                 tempNumFaces++;
                             }

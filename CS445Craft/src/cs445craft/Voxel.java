@@ -1,14 +1,18 @@
-/*
- * To change this license header, choose License Headers in Project Properties.
- * To change this template file, choose Tools | Templates
- * and open the template in the editor.
- */
+/***************************************************************
+* file: Voxel.java
+* author: CS445 Group 42^3
+* class: CS 445 – Computer Graphics
+*
+* assignment: Final Project
+* date last modified: 10/28/2017
+*
+* purpose: This class is static and not meant to be instantiated.
+* It contains an enum of all th VoxelTypes and has static methods
+* for writing the vertices of voxel faces to a float buffer.
+* 
+****************************************************************/
 package cs445craft;
 
-/**
- *
- * @author cthill
- */
 public class Voxel {
     public static final int BLOCK_SIZE = 2;
     
@@ -50,6 +54,10 @@ public class Voxel {
         SAND_STONE
     }
     
+    /**
+    * method: isTranslucent()
+    * purpose: Check if a given VoxelType is translucent
+    **/
     public static boolean isTranslucent(VoxelType v) {
         return (
             v == VoxelType.WATER ||
@@ -58,6 +66,11 @@ public class Voxel {
         );
     }
     
+    /**
+    * method: isPartiallyTransparent()
+    * purpose: Check if a given VoxelType has a partially transparent texture
+    * (the screen uses GL_ALPHA_TEST to cut out fully transparent parts of textures).
+    **/
     public static boolean isPartiallyTransparent(VoxelType v) {
         return (
             v == VoxelType.LEAVES ||
@@ -72,10 +85,10 @@ public class Voxel {
         );
     }
     
-    public static boolean isSeeTrough(VoxelType v) {
-        return isTranslucent(v) || isPartiallyTransparent(v);
-    }
-    
+    /**
+    * method: isSolid()
+    * purpose: Check if a given VoxelType is solid.
+    **/
     public static boolean isSolid(VoxelType v) {
         return !(
             v == VoxelType.WATER ||
@@ -89,6 +102,10 @@ public class Voxel {
         );
     }
     
+    /**
+    * method: isBreakable()
+    * purpose: Check if a given VoxelType is breakable.
+    **/
     public static boolean isBreakable(VoxelType v) {
         return !(
             v == VoxelType.WATER ||
@@ -97,6 +114,10 @@ public class Voxel {
         );
     }
     
+    /**
+    * method: isMineThrough()
+    * purpose: Check if a given VoxelType can be mined through.
+    **/
     public static boolean isMineThrough(VoxelType v) {
         return (
             v == VoxelType.WATER ||
@@ -104,6 +125,10 @@ public class Voxel {
         );
     }
     
+    /**
+    * method: isCrossType()
+    * purpose: Check if a given VoxelType is a cross shape instead of a cube.
+    **/
     public static boolean isCrossType(VoxelType v) {
         return (
             v == VoxelType.RED_FLOWER ||
@@ -115,6 +140,11 @@ public class Voxel {
         );
     }
     
+    /**
+    * method: breakIfSupportRemoved()
+    * purpose: Check if a given VoxelType needs to be broken if its supporting
+    * Voxel is also broken.
+    **/
     public static boolean breakIfSupportRemoved(VoxelType v) {
         return (
             v == VoxelType.RED_FLOWER ||
@@ -128,8 +158,15 @@ public class Voxel {
         );
     }
     
-    
-    public static void writeFaceVertices(float[] data, int writeIndex, int face, VoxelType voxelType, int x, int y, int z) {
+    /**
+    * method: writeFaceVertices()
+    * purpose: Write the vertices for a single face at a given x, y, z position
+    * to a given float buffer. Note, the x,y,z coordinates are in OpenGL space
+    * 
+    * This method checks if the Voxel is a cross type or not and calls the appropriate
+    * helper method.
+    **/
+    public static void writeFaceVertices(float[] data, int writeIndex, int face, VoxelType voxelType, float x, float y, float z) {
         if (isCrossType(voxelType)) {
             writeFaceVerticesCross(data, writeIndex, face, voxelType, x, y, z);
         } else {
@@ -137,24 +174,26 @@ public class Voxel {
         }
     }
     
-    private static void writeFaceVerticesCross(float[] data, int writeIndex, int face, VoxelType voxelType, int x, int y, int z) {
-        float blockX = (float) (x * Voxel.BLOCK_SIZE);
-        float blockY = (float) (y * Voxel.BLOCK_SIZE);
-        float blockZ = (float) (z * Voxel.BLOCK_SIZE);
-        
+    /**
+    * method: writeFaceVerticesCross()
+    * purpose: Write the vertices for a single face at a given x, y, z position
+    * to a given float buffer. Checks which face is requested and calls the appropriate
+    * helper method. This method is for the cross type.
+    **/
+    private static void writeFaceVerticesCross(float[] data, int writeIndex, int face, VoxelType voxelType, float x, float y, float z) {        
         float[] vertices;
         switch (face) {
             case FACE_FRONT:
-                vertices = getFrontFaceCross(voxelType, blockX, blockY, blockZ);
+                vertices = getFrontFaceCross(voxelType, x, y, z);
                 break;
             case FACE_BACK:
-                vertices = getBackFaceCross(voxelType, blockX, blockY, blockZ);
+                vertices = getBackFaceCross(voxelType, x, y, z);
                 break;
             case FACE_LEFT:
-                vertices = getLeftFaceCross(voxelType, blockX, blockY, blockZ);
+                vertices = getLeftFaceCross(voxelType, x, y, z);
                 break;
             case FACE_RIGHT:
-                vertices = getRightFaceCross(voxelType, blockX, blockY, blockZ);
+                vertices = getRightFaceCross(voxelType, x, y, z);
                 break;
             default:
                 throw new RuntimeException("Unknown face");
@@ -162,31 +201,33 @@ public class Voxel {
         
         System.arraycopy(vertices, 0, data, writeIndex, vertices.length);
     }
-    
-    private static void writeFaceVerticesCube(float[] data, int writeIndex, int face, VoxelType voxelType, int x, int y, int z) {
-        float blockX = (float) (x * Voxel.BLOCK_SIZE);
-        float blockY = (float) (y * Voxel.BLOCK_SIZE);
-        float blockZ = (float) (z * Voxel.BLOCK_SIZE);
-        
+
+    /**
+    * method: writeFaceVertices()
+    * purpose: Write the vertices for a single face at a given x, y, z position
+    * to a given float buffer. Checks which face is requested and calls the appropriate
+    * helper method. This method is for the cube type.
+    **/
+    private static void writeFaceVerticesCube(float[] data, int writeIndex, int face, VoxelType voxelType, float x, float y, float z) {
         float[] vertices;
         switch (face) {
             case FACE_TOP:
-                vertices = getTopFace(voxelType, blockX, blockY, blockZ);
+                vertices = getTopFace(voxelType, x, y, z);
                 break;
             case FACE_BOTTOM:
-                vertices = getBottomFace(voxelType, blockX, blockY, blockZ);
+                vertices = getBottomFace(voxelType, x, y, z);
                 break;
             case FACE_FRONT:
-                vertices = getFrontFace(voxelType, blockX, blockY, blockZ);
+                vertices = getFrontFace(voxelType, x, y, z);
                 break;
             case FACE_BACK:
-                vertices = getBackFace(voxelType, blockX, blockY, blockZ);
+                vertices = getBackFace(voxelType, x, y, z);
                 break;
             case FACE_LEFT:
-                vertices = getLeftFace(voxelType, blockX, blockY, blockZ);
+                vertices = getLeftFace(voxelType, x, y, z);
                 break;
             case FACE_RIGHT:
-                vertices = getRightFace(voxelType, blockX, blockY, blockZ);
+                vertices = getRightFace(voxelType, x, y, z);
                 break;
             default:
                 throw new RuntimeException("Unknown face");
@@ -195,6 +236,11 @@ public class Voxel {
         System.arraycopy(vertices, 0, data, writeIndex, vertices.length);
     }
     
+    /**
+    * method: getTopFace()
+    * purpose: Get the vertices of the top face of a given VoxelType at a given
+    * x,y,z location. This is for the cube shape.
+    **/
     private static float[] getTopFace(VoxelType voxelType, float x, float y, float z) {
         float s = ((float) Voxel.BLOCK_SIZE) / 2;
         
@@ -209,10 +255,9 @@ public class Voxel {
         float offset = (2048f/16)/2048f;
         int[] t = getTextureCoords(voxelType);
         
-        // vertex, normal, texture, color
+        // vertex, texture, vertex, texture...
         return new float[] {
             // position
-            // normal
             // color
             // texture
 
@@ -230,6 +275,11 @@ public class Voxel {
         };
     }
     
+    /**
+    * method: getBottomFace()
+    * purpose: Get the vertices of the bottom face of a given VoxelType at a given
+    * x,y,z location. This is for the cube shape.
+    **/
     private static float[] getBottomFace(VoxelType voxelType, float x, float y, float z) {
         float s = ((float) Voxel.BLOCK_SIZE) / 2;
         
@@ -245,10 +295,9 @@ public class Voxel {
         int[] t = getTextureCoords(voxelType);
         
         
-        // vertex, normal, texture, color
+        // vertex, texture, vertex, texture...
         return new float[] {
             // position
-            // normal
             // texture
 
             x + s, y - s, z - s,
@@ -265,6 +314,11 @@ public class Voxel {
         };
     }
     
+    /**
+    * method: getFrontFace()
+    * purpose: Get the vertices of the front face of a given VoxelType at a given
+    * x,y,z location. This is for the cube shape.
+    **/
     private static float[] getFrontFace(VoxelType voxelType, float x, float y, float z) {
         float s = ((float) Voxel.BLOCK_SIZE) / 2;
         
@@ -280,10 +334,9 @@ public class Voxel {
         int[] t = getTextureCoords(voxelType);
         
         
-        // vertex, normal, texture, color
+        // vertex, texture, vertex, texture...
         return new float[] {
             // position
-            // normal
             // texture
             x + s, y + s - h, z - s + e,
             offset*(t[4] + 0), offset*(t[5] + 0),
@@ -299,6 +352,11 @@ public class Voxel {
         };
     }
     
+    /**
+    * method: getBackFace()
+    * purpose: Get the vertices of the back face of a given VoxelType at a given
+    * x,y,z location. This is for the cube shape.
+    **/
     private static float[] getBackFace(VoxelType voxelType, float x, float y, float z) {
         float s = ((float) Voxel.BLOCK_SIZE) / 2;
         
@@ -314,10 +372,9 @@ public class Voxel {
         int[] t = getTextureCoords(voxelType);
         
         
-        // vertex, normal, texture, color
+        // vertex, texture, vertex, texture...
         return new float[] {
             // position
-            // normal
             // texture
 
             x + s, y - s, z + s - e,
@@ -334,6 +391,11 @@ public class Voxel {
         };
     }
     
+    /**
+    * method: getLeftFace()
+    * purpose: Get the vertices of the left face of a given VoxelType at a given
+    * x,y,z location. This is for the cube shape.
+    **/
     private static float[] getLeftFace(VoxelType voxelType, float x, float y, float z) {
         float s = ((float) Voxel.BLOCK_SIZE) / 2;
         
@@ -349,10 +411,9 @@ public class Voxel {
         int[] t = getTextureCoords(voxelType);
         
         
-        // vertex, normal, texture, color
+        // vertex, texture, vertex, texture...
         return new float[] {
             // position
-            // normal
             // texture
 
             x - s + e, y + s - h, z - s,
@@ -369,6 +430,11 @@ public class Voxel {
         };
     }
     
+    /**
+    * method: getRightFace()
+    * purpose: Get the vertices of the right face of a given VoxelType at a given
+    * x,y,z location. This is for the cube shape.
+    **/
     private static float[] getRightFace(VoxelType voxelType, float x, float y, float z) {
         float s = ((float) Voxel.BLOCK_SIZE) / 2;
         
@@ -384,10 +450,9 @@ public class Voxel {
         int[] t = getTextureCoords(voxelType);
         
         
-        // vertex, normal, texture, color
+        // vertex, texture, vertex, texture...
         return new float[] {
             // position
-            // normal
             // texture
 
             x + s - e, y + s - h, z + s,
@@ -405,8 +470,11 @@ public class Voxel {
     }
     
     
-    
-    
+    /**
+    * method: getFrontFace()
+    * purpose: Get the vertices of the front face of a given VoxelType at a given
+    * x,y,z location. This is for the cross shape.
+    **/
     private static float[] getFrontFaceCross(VoxelType voxelType, float x, float y, float z) {
         float s = ((float) Voxel.BLOCK_SIZE) / 2;
 
@@ -414,10 +482,9 @@ public class Voxel {
         int[] t = getTextureCoords(voxelType);
         
         
-        // vertex, normal, texture, color
+        // vertex, texture, vertex, texture...
         return new float[] {
             // position
-            // normal
             // texture
             x + s, y + s, z,
             offset*(t[4] + 0), offset*(t[5] + 0),
@@ -433,6 +500,11 @@ public class Voxel {
         };
     }
     
+    /**
+    * method: getBackFaceCross()
+    * purpose: Get the vertices of the back face of a given VoxelType at a given
+    * x,y,z location. This is for the cross shape.
+    **/
     private static float[] getBackFaceCross(VoxelType voxelType, float x, float y, float z) {
         float s = ((float) Voxel.BLOCK_SIZE) / 2;
         
@@ -448,10 +520,9 @@ public class Voxel {
         int[] t = getTextureCoords(voxelType);
         
         
-        // vertex, normal, texture, color
+        // vertex, texture, vertex, texture...
         return new float[] {
             // position
-            // normal
             // texture
 
             x + s, y - s, z,
@@ -468,6 +539,11 @@ public class Voxel {
         };
     }
     
+    /**
+    * method: getLeftFaceCross()
+    * purpose: Get the vertices of the left face of a given VoxelType at a given
+    * x,y,z location. This is for the cross shape.
+    **/
     private static float[] getLeftFaceCross(VoxelType voxelType, float x, float y, float z) {
         float s = ((float) Voxel.BLOCK_SIZE) / 2;
         
@@ -483,10 +559,9 @@ public class Voxel {
         int[] t = getTextureCoords(voxelType);
         
         
-        // vertex, normal, texture, color
+        // vertex, texture, vertex, texture...
         return new float[] {
             // position
-            // normal
             // texture
 
             x, y + s, z - s,
@@ -503,6 +578,11 @@ public class Voxel {
         };
     }
     
+    /**
+    * method: getRightFaceCross()
+    * purpose: Get the vertices of the right face of a given VoxelType at a given
+    * x,y,z location. This is for the cross shape.
+    **/
     private static float[] getRightFaceCross(VoxelType voxelType, float x, float y, float z) {
         float s = ((float) Voxel.BLOCK_SIZE) / 2;
         
@@ -518,10 +598,9 @@ public class Voxel {
         int[] t = getTextureCoords(voxelType);
         
         
-        // vertex, normal, texture, color
+        // vertex, texture, vertex, texture...
         return new float[] {
             // position
-            // normal
             // texture
 
             x, y + s, z + s,
@@ -538,6 +617,10 @@ public class Voxel {
         };
     }
     
+    /**
+    * method: getTextureCoords()
+    * purpose: Get the x and y texture coordinates for each face of a given VoxelType.
+    **/
     private static int[] getTextureCoords(VoxelType v) {
         int topX, btmX, fntX, bckX, lftX, rhtX;
         int topY, btmY, fntY, bckY, lftY, rhtY;

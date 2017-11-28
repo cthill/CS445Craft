@@ -39,7 +39,7 @@ public class Chunk extends Drawable {
     private final int VBOHandle;
     private final int VBOHandleTranslucent;
     
-    private boolean dirty, generated, built, scheduledForRebuild;
+    private boolean dirty, generated, built;
     
     public Chunk(World world, int indexI, int indexJ) {
         this.world = world;
@@ -61,8 +61,8 @@ public class Chunk extends Drawable {
         return dirty;
     }
     
-    public void setDirty(boolean dirty) {
-        this.dirty = dirty;
+    public void setDirty() {
+        this.dirty = true;
     }
     
     public boolean getGenerated() {
@@ -71,14 +71,6 @@ public class Chunk extends Drawable {
     
     public void setGenerated() {
         this.generated = true;
-    }
-
-    public boolean getScheduledForRebuild() {
-        return scheduledForRebuild;
-    }
-    
-    public void setScheduledForRebuild(boolean scheduledForRebuild) {
-        this.scheduledForRebuild = scheduledForRebuild;
     }
     
     public void copyBlocks(VoxelType[][][] wBlocks, int sx, int lx, int sy, int ly, int sz, int lz) {
@@ -162,7 +154,7 @@ public class Chunk extends Drawable {
         else if (z > CHUNK_S -1)
             zDir = 1;
         
-        // not traversing chunk boundary, lookup block in this chunk
+        // not traversing chunk boundary
         if (xDir == 0 && zDir == 0) {
             return this;
         }
@@ -180,7 +172,7 @@ public class Chunk extends Drawable {
         int wrappedX = Math.floorMod(x, CHUNK_S);
         int wrappedZ = Math.floorMod(z, CHUNK_S);
         
-        return lookupChunk.blocks[y][wrappedX][wrappedZ]; //voxelLookupSave(wrappedX, y, wrappedZ);
+        return lookupChunk.blocks[y][wrappedX][wrappedZ]; //voxelLookupSafe(wrappedX, y, wrappedZ);
     }
     
     public VoxelType voxelLookupTraverseChunks(int x, int y, int z) {
@@ -198,9 +190,8 @@ public class Chunk extends Drawable {
                 breakBlock(x, y + 1, z);
             }
             
-            // break block
+            // break block and fix the mesh
             blocks[y][x][z] = null;
-             
             rebuildMesh();
             
             // check if breaking block at chunk boundary
@@ -221,15 +212,18 @@ public class Chunk extends Drawable {
                 // lookup adjacent chunk and mark it as dirty so the mesh will be rebuilt
                 Chunk adjacent = world.findAdjacentChunk(this, xDir, 0);
                 if (adjacent != null) {
-                    adjacent.setDirty(true);
+                    //adjacent.setDirty();
+                    adjacent.rebuildMesh();
                 }
             }
             
             if (zDir != 0) {
                 // lookup adjacent chunk and mark it as dirty so the mesh will be rebuilt
                 Chunk adjacent = world.findAdjacentChunk(this, 0, zDir);
-                if (adjacent != null)
-                    adjacent.setDirty(true);
+                if (adjacent != null) {
+                    //adjacent.setDirty();
+                    adjacent.rebuildMesh();
+                }
             }
         }
     }
@@ -329,6 +323,7 @@ public class Chunk extends Drawable {
         glBindBuffer(GL_ARRAY_BUFFER, 0);
         
         // set the flags
+        dirty = false;
         built = true;
         
         System.out.println("Mesh " + indexI + "," + indexJ + " in " + (threadTimer.getCurrentThreadCpuTime() - start) / 1000000000.0);

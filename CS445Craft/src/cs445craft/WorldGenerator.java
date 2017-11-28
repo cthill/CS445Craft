@@ -88,7 +88,6 @@ public class WorldGenerator {
         world.getChunks().forEach(chunk -> {
             chunk.setGenerated();
             chunk.rebuildMesh();
-            chunk.setDirty(false);
         });
         
         return world;

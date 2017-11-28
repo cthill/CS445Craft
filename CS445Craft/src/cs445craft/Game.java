@@ -3,10 +3,7 @@ package cs445craft;
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.IOException;
-import java.util.LinkedList;
-import java.util.List;
-import java.util.Queue;
-import java.util.Random;
+import java.util.*;
 import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.BlockingQueue;
 import org.lwjgl.LWJGLException;
@@ -44,6 +41,7 @@ public class Game {
     private final Camera camera;
     private final Screen screen;
     
+    private final Set<Chunk> scheduledForRebuild;
     private final BlockingQueue<Chunk> ungeneratedChunkQueue;
     private final Thread chunkGenerator;
     
@@ -57,13 +55,15 @@ public class Game {
         // load texture
         TextureLoader.getTexture("png", new FileInputStream(new File("res/terrain.png")));
         
-        // setup world and taskQueue
+        // setup world, taskQueue, and screen
         rand = new Random();
         worldGen = new WorldGenerator(rand.nextInt(), INITIAL_WORLD_SIZE);
         world = worldGen.getOrGenerate();
         taskQueue = new LinkedList<>();
-        
         screen.addObjects(world.getChunks());
+        
+        // setup rebuild schedule set
+        scheduledForRebuild = new HashSet<>();
         
         // setup the chunk generation thread
         ungeneratedChunkQueue = new LinkedBlockingQueue<Chunk>();
@@ -106,12 +106,11 @@ public class Game {
             screen.drawFrame();
             
             // the screen will mark drawn chunks as active
-            world.getChunks().stream().filter(chunk -> chunk.getActive() && chunk.getGenerated() && chunk.getDirty() && !chunk.getScheduledForRebuild()).forEach(chunk -> {
-                chunk.setScheduledForRebuild(true);
+            world.getChunks().stream().filter(chunk -> chunk.getActive() && chunk.getGenerated() && chunk.getDirty() && !scheduledForRebuild.contains(chunk)).forEach(chunk -> {
+                scheduledForRebuild.add(chunk);
                 taskQueue.add(() -> {
                     chunk.rebuildMesh();
-                    chunk.setDirty(false);
-                    chunk.setScheduledForRebuild(false);
+                    scheduledForRebuild.remove(chunk);
                 });
             });
         }
@@ -144,7 +143,6 @@ public class Game {
 
         if (gridPositionUpdated || chunkPositionUpdated) {
 //            System.out.println("pos (" + worldX + "," + worldZ + ") chunk (" + chunkI + "," + chunkJ + ")");
-            //screen.moveWorldLight(worldX * Voxel.BLOCK_SIZE, -worldZ * Voxel.BLOCK_SIZE);
         }
 
         if (chunkPositionUpdated && DYNAMIC_WORLD_GENERATION) {
@@ -368,6 +366,7 @@ public class Game {
             done = true;
         }
         
+        @Override
         public void run() {
             while (!done) {
                 Chunk chunkToFill = ungeneratedChunkQueue.poll();
@@ -375,11 +374,13 @@ public class Game {
                     continue;
                 }
                 
+                // generate chunk and set it dirty so the mesh will be rebuilt
                 worldGen.fillChunkGenerateRandom(chunkToFill);
-                chunkToFill.setGenerated();
-                chunkToFill.setDirty(true);
+                chunkToFill.setDirty();
+                
                 world.findAllAdjacentChunks(chunkToFill).forEach(adjChunk -> {
-                    adjChunk.setDirty(true);
+                    // set adjacent chunks as dirty so they will be rebuild as well
+                    adjChunk.setDirty();
                 });
             }
         }

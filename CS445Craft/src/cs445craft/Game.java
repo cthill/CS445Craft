@@ -26,8 +26,8 @@ import org.newdawn.slick.opengl.TextureLoader;
 
 public class Game {
     // game constants
-    public static final int RES_WIDTH = 1024;
-    public static final int RES_HEIGHT = 768;
+    public static final int RES_WIDTH = 640;
+    public static final int RES_HEIGHT = 480;
     public static final int ASYNC_TASKS_PER_FRAME = 2;
     private static final boolean DYNAMIC_WORLD_GENERATION = true;
     private static int CHUNK_GENERATION_BOUNDARY = 3;

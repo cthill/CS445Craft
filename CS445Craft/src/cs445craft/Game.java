@@ -26,8 +26,8 @@ import org.newdawn.slick.opengl.TextureLoader;
 
 public class Game {
     // game constants
-    public static final int RES_WIDTH = 640;
-    public static final int RES_HEIGHT = 480;
+    public static final int RES_WIDTH = 1280;
+    public static final int RES_HEIGHT = 720;
     public static final int ASYNC_TASKS_PER_FRAME = 2;
     private static final boolean DYNAMIC_WORLD_GENERATION = true;
     private static int CHUNK_GENERATION_BOUNDARY = 3;
@@ -67,7 +67,6 @@ public class Game {
         float top = Chunk.CHUNK_H * Voxel.BLOCK_SIZE;
         camera = new Camera(center, top, center);
         screen = new Screen(RES_WIDTH, RES_HEIGHT, "CS445Craft", camera);
-        screen.moveLight(center + Chunk.CHUNK_S * Voxel.BLOCK_SIZE, top, center);
         
         // load texture
         TextureLoader.getTexture("png", new FileInputStream(new File("res/terrain.png")));

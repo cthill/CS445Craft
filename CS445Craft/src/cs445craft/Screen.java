@@ -34,9 +34,6 @@ public class Screen {
     private final Camera camera;
     private final List<Drawable> objects;
     
-    private FloatBuffer lightPosition;
-    private FloatBuffer lightColor;
-    
     public Screen(int width, int height, String title, Camera camera) throws LWJGLException {
         this.width = width;
         this.height = height;
@@ -57,23 +54,9 @@ public class Screen {
         glEnable(GL_TEXTURE_2D);
         glAlphaFunc(GL_GREATER, 0.5f);
         glBlendFunc(GL_SRC_ALPHA, GL_ONE_MINUS_SRC_ALPHA);
-        glFrontFace(GL_CW);
-        
-        lightPosition = BufferUtils.createFloatBuffer(4);
-        lightPosition.put(0).put((Chunk.CHUNK_H + 5) * Voxel.BLOCK_SIZE).put(0).put(1.0f).flip();
-        lightColor = BufferUtils.createFloatBuffer(4);
-        lightColor.put(1.0f).put(1.0f).put(1.0f).put(1.0f).flip();        
+        glFrontFace(GL_CW);      
     }
     
-    /**
-    * method: moveLight()
-    * purpose: move the world light to a new x,y,z position
-    **/
-    public void moveLight(float x, float y, float z) {
-        lightPosition = BufferUtils.createFloatBuffer(4);
-        lightPosition.put(x).put(y).put(z).put(1.0f).flip();
-    }
-
     /**
     * method: addObject()
     * purpose: add an object that satisfies the Drawable interface. Object will
@@ -165,14 +148,6 @@ public class Screen {
         glPushMatrix();
         camera.lookThrough();
         
-        // enables our lighting
-        glEnable(GL_LIGHTING);
-        glLight(GL_LIGHT0, GL_POSITION, lightPosition);
-        glLight(GL_LIGHT0, GL_SPECULAR, lightColor);
-        glLight(GL_LIGHT0, GL_DIFFUSE, lightColor);
-        glLight(GL_LIGHT0, GL_AMBIENT, lightColor);
-        glEnable(GL_LIGHT0);
-
         // 3d draw solid objects
         // enable alpha test so we can cut out transparent parts of textures (like leaves or flowers)
         glEnable(GL_ALPHA_TEST);
@@ -204,7 +179,6 @@ public class Screen {
         // 3d draw finish
         glPopMatrix();
         glColor3f(1.0f,1.0f,1.0f);
-        glDisable(GL_LIGHTING);
         glDisable(GL_DEPTH_TEST);
         glEnable(GL_BLEND);
     }

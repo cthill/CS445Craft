@@ -19,7 +19,6 @@ import static cs445craft.Chunk.CHUNK_S;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.List;
-import java.util.Random;
 
 import java.lang.management.ThreadMXBean;
 import java.lang.management.ManagementFactory;
@@ -48,7 +47,7 @@ public class WorldGenerator {
     private static final int NOISE_FACTOR_REGION_HEIGHT = 7;
 
     private final int initialSize;
-    private final Random rand;
+    private final FastRandom rand;
     
     private final SimplexNoise noiseGenLocalHeight;
     private final SimplexNoise noiseGenBlockType;
@@ -66,7 +65,7 @@ public class WorldGenerator {
     
     public WorldGenerator(int seed, int initialSize) {
         this.initialSize = initialSize;
-        this.rand = new Random();
+        this.rand = new FastRandom();
         
         noiseGenLocalHeight = new SimplexNoise(Chunk.CHUNK_S * 5, 0.30, seed);
         noiseGenRegionHeight = new SimplexNoise(Chunk.CHUNK_S * 10, 0.25, seed + 1);

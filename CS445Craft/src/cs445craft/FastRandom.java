@@ -9,6 +9,10 @@ public class FastRandom extends Random {
         seed = System.nanoTime();
     }
     
+    public FastRandom(int seed) {
+        this.seed = seed;
+    }
+    
     protected int next(int nbits) {
         synchronized (this) {
             long x = this.seed;

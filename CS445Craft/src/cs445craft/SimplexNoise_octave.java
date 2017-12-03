@@ -65,7 +65,7 @@ public class SimplexNoise_octave {  // Simplex noise in 2D, 3D and 4D
     }
 
     //the random for the swaps
-    Random rand=new Random(seed);
+    Random rand=new FastRandom(seed);
 
     //the seed determines the swaps that occur between the default order and the order we're actually going to use
     for(int i=0;i<NUMBEROFSWAPS;i++){

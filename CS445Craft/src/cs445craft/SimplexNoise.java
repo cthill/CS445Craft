@@ -23,7 +23,7 @@ public class SimplexNoise {
         frequencys=new double[numberOfOctaves];
         amplitudes=new double[numberOfOctaves];
 
-        Random rnd=new Random(seed);
+        Random rnd=new FastRandom(seed);
 
         for(int i=0;i<numberOfOctaves;i++){
             octaves[i]=new SimplexNoise_octave(rnd.nextInt());
